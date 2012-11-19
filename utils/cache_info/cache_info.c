@@ -20,6 +20,8 @@
 #include "pubinc.h"
 #include "ngx_http_cache.h"
     
+ngx_http_file_cache_header_t cache_header;
+
 void
 cache_header_dump(ngx_http_file_cache_header_t *cache_header)
 {
@@ -32,30 +34,78 @@ cache_header_dump(ngx_http_file_cache_header_t *cache_header)
     printf("body: %d\n", cache_header->body_start);
 }
 
-int
-main(int argc, char **argv)
+void
+cache_header_show(char *fname, int isshow)
 {
-    int n;
     FILE *fp = NULL;
-    ngx_http_file_cache_header_t cache_header;
-
-    if (argc != 2) {
-        printf("Usage: %s <cache_file_name>\n", argv[0]);
-        exit(-1);
-    }
-
-    fp = fopen(argv[1], "rb");
+    fp = fopen(fname, "rb");
     if (!fp) {
-        printf("file %s open error!\n", argv[1]);
-        return -1;
+        printf("file %s open error!\n", fname);
+        return;
     }
 
     memset(&cache_header, 0, sizeof(ngx_http_file_cache_header_t));
-    n = fread(&cache_header, sizeof(ngx_http_file_cache_header_t), 1, fp); 
-
-    cache_header_dump(&cache_header);
+    if (fread(&cache_header, sizeof(ngx_http_file_cache_header_t), 1, fp) <= 0) {
+        printf("read %s error!\n", fname);
+    } else if (isshow) {
+        cache_header_dump(&cache_header);
+    }
 
     fclose(fp);
+}
+
+int
+cache_header_modify(char *expired, char *fname, ngx_http_file_cache_header_t *cache_header)
+{
+    FILE *fp = NULL;
+    int secs;
+    char ope;
+//    char new_file[1024];
+
+    if (sscanf(expired, "%c%d", &ope, &secs) != 2) {
+        printf("arg %s error!\n", expired);
+        return -1;
+    }
+
+    printf("add %c%d secs to expired...\n", ope, secs);
+    if (ope == '+') {
+        cache_header->valid_sec += secs;
+    } else {
+        cache_header->valid_sec -= secs;
+    }
+
+//    sprintf(new_file, "%s.new", fname);
+
+    fp = fopen(fname, "rb+");
+    if (!fp) {
+        printf("file %s open error!\n", fname);
+        return -2;
+    }
+    
+    if (fwrite(cache_header, sizeof(ngx_http_file_cache_header_t), 1, fp) <= 0) {
+        printf("write %s error!\n", fname);
+        fclose(fp);
+        return -3;
+    }
+    fclose(fp);
+
+    return 0;
+}
+
+int
+main(int argc, char **argv)
+{
+    if ((argc != 2) && (argc != 3)) {
+        printf("Usage: %s <cache_file_name> +<expired_seconds(optinal)>\n", argv[0]);
+        exit(-1);
+    }
+
+    if (argc == 3) {
+        cache_header_show(argv[1], 0);
+        cache_header_modify(argv[2], argv[1], &cache_header);
+    }
+ 
+    cache_header_show(argv[1], 1);
 
     exit(0);
 }
