@@ -16,6 +16,8 @@
 
 #include "ngx_capcache_module.h"
 
+static u_char ngx_capcache_body[] = { '<', 'C', 'A', 'P', 'C', 'A', 'C', 'H', 'E', '>' };
+
 /* capcache config data */
 typedef struct ngx_capcache_loc_conf 
 {
@@ -25,6 +27,7 @@ typedef struct ngx_capcache_loc_conf
 typedef struct ngx_capcache_ctx 
 {
     ngx_uint_t http_status;
+    ngx_uint_t is_cached;
 } ngx_capcache_ctx_t, *ngx_capcache_ctx_p;
 
 
@@ -34,7 +37,7 @@ static ngx_command_t ngx_capcache_commands[] = {
         NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
         ngx_conf_set_flag_slot,
         NGX_HTTP_LOC_CONF_OFFSET,
-        offsetof(ngx_capcache_conf_t, capcache_enable),
+        offsetof(ngx_capcache_loc_conf_t, capcache_enable),
         NULL 
     },
  
@@ -60,8 +63,8 @@ static ngx_http_module_t ngx_capcache_module_ctx = {
     ngx_capcache_merge_loc_conf   /* merge location configuration */
 };
 
-/* connect config and cb dirctives */
-ngx_module_t  ngx_http_minify_filter_module = {
+/* connect config and cb dirctives, must same as module name */
+ngx_module_t ngx_capcache_module = {
     NGX_MODULE_V1,
     &ngx_capcache_module_ctx,              /* module context */
     ngx_capcache_commands,                 /* module directives */
@@ -82,111 +85,109 @@ static ngx_http_output_body_filter_pt    ngx_http_next_body_filter;
 static ngx_int_t
 ngx_capcache_header_filter(ngx_http_request_t *r)
 {
-    ngx_minify_conf_t  *conf;
-    ngx_minify_ctx_t   *ctx;
-    ngx_minify_type_e type = MINIFY_FILE_TYPE_NONE;
+    ngx_capcache_loc_conf_t *conf;
+    ngx_capcache_ctx_t *ctx;
 
-    conf = ngx_http_get_module_loc_conf(r, ngx_http_minify_filter_module);
+    ngx_http_upstream_t *u;
+    u = r->upstream;
+#if (NGX_HTTP_CACHE)
 
-    if ((!conf->html_enable && !conf->css_enable && !conf->js_enable)
-        || (r->headers_out.status != NGX_HTTP_OK
-            && r->headers_out.status != NGX_HTTP_FORBIDDEN
-            && r->headers_out.status != NGX_HTTP_NOT_FOUND)
-        || r->header_only
-        || r->headers_out.content_type.len == 0
-        || (r->headers_out.content_encoding
-            && r->headers_out.content_encoding->value.len))
-    {
+    if (u->conf->cache) {
+        /* DO IT */
+    }
+
+#endif
+
+    if ((r->headers_out.status != 304) && 
+        (r->headers_out.status != 200)) {
+        goto out;
+    }
+
+    conf = ngx_http_get_module_loc_conf(r, ngx_capcache_module);
+
+    /* capcache is enable or not */
+    if (!conf->capcache_enable) {
         return ngx_http_next_header_filter(r);
     }
 
-    if (conf->html_enable && (ngx_http_test_content_type(r, &conf->html_types) != NULL))
-    {
-        type = MINIFY_FILE_TYPE_HTML;
-    } else if (conf->js_enable && (ngx_http_test_content_type(r, &conf->js_types) != NULL)) 
-    {
-        type = MINIFY_FILE_TYPE_JS;
-    } else if (conf->css_enable && (ngx_http_test_content_type(r, &conf->css_types) != NULL))
-    {
-        type = MINIFY_FILE_TYPE_CSS;
-    } else
-    {
-        return ngx_http_next_header_filter(r);
-    }
-
-    ctx = ngx_pcalloc(r->pool, sizeof(ngx_minify_ctx_t));
+    ctx = ngx_pcalloc(r->pool, sizeof(ngx_capcache_ctx_t));
     if (ctx == NULL) {
         return NGX_ERROR;
     }
     
-    ctx->type = type;
+    ngx_http_set_ctx(r, ctx, ngx_capcache_module);
+    
+    ctx->http_status = r->headers_out.status;
+    ctx->is_cached = 0;
 
-    ngx_http_set_ctx(r, ctx, ngx_http_minify_filter_module);
-
-    ngx_http_clear_content_length(r);
-    ngx_http_clear_accept_ranges(r);
-
-    r->filter_need_in_memory = 1;
-    r->main_filter_need_in_memory = 1;
-
+out:
     return ngx_http_next_header_filter(r);
 }
 
 static ngx_int_t
-ngx_http_minify_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
+ngx_capcache_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
 {
-    ngx_minify_ctx_t *ctx;
-    ngx_chain_t *chain_link;
-    ngx_minify_process_f pf = NULL;
-    u_char *newbuf = NULL;
-    int buflen = 0;
-    
-    if (in == NULL || r->header_only) {
+    ngx_http_cache_t *c;
+    ngx_http_upstream_t *u;
+    ngx_capcache_ctx_t *ctx;
+    u_char *p = NULL;
+    u_char *buf = NULL;
+    size_t len;
+ 
+    if (in == NULL) {
         goto out;
     }
 
-    ctx = ngx_http_get_module_ctx(r, ngx_http_minify_filter_module);
+    ctx = ngx_http_get_module_ctx(r, ngx_capcache_module);
     if (ctx == NULL) {
         goto out;
     }
 
-    pf = ngx_http_minify_process[ctx->type];
-    if (!pf) {
+    if (ctx->is_cached) {
         goto out;
     }
 
-    for (chain_link = in; chain_link; chain_link = chain_link->next) {
-        
-        buflen = ngx_buf_size(chain_link->buf);
-
-        /* if cache exist, malloc new buf */
-        if (ctx->cachelen) {
-            /* pcalloc new buf */
-            newbuf = ngx_palloc(r->pool, ctx->cachelen + buflen);
-            if (newbuf == NULL){
-                goto out;
-            }
-                
-            ngx_memcpy(newbuf, ctx->cache, ctx->cachelen);
-            ngx_memcpy(newbuf + ctx->cachelen, chain_link->buf->pos, buflen);
-
-            /* TODO: need ngx_pfree old buf? */
-
-            /* assign new buf pointer */
-            chain_link->buf->start = newbuf;
-            chain_link->buf->pos = newbuf;
-            chain_link->buf->end = newbuf + ctx->cachelen + buflen;
-            chain_link->buf->last = chain_link->buf->end;
-
-            /* clear ctx cache */
-            ctx->cachelen = 0;
+    /* 1. create buf chain */
+    c = r->cache;
+    u = r->upstream;
+    /* get crc32 & key */
+    if (c == NULL) {
+        if (ngx_http_file_cache_new(r) != NGX_OK) {
+            goto out;
         }
 
-        (*pf)(chain_link->buf, ctx);
-        
-        /* send buf from memory */
-        chain_link->buf->in_file = 0;
+        if (u->create_key(r) != NGX_OK) {  /* ngx_http_proxy_create_key */
+            goto out;
+        }
+
+        ngx_http_file_cache_create_key(r);
+    
+        c = r->cache;
     }
+
+    len = c->header_start + sizeof(ngx_capcache_body);
+    buf = ngx_pcalloc(r->pool, len);
+    if (buf == NULL) {
+        return NGX_ERROR;
+    }
+
+    /* set file header */
+    c->valid_sec = ngx_time() - 1;
+    ngx_http_file_cache_set_header(r, buf);
+    p = buf + c->header_start;
+    p = ngx_cpymem(p, ngx_capcache_body, sizeof(ngx_capcache_body));
+
+    p = buf;
+    /* 2. write cache file */
+    //ngx_write_chain_to_temp_file(ngx_temp_file_t *tf, ngx_chain_t *chain)
+    
+    /* 3. move cache file */
+    
+    /* 4. insert into rbtree */
+
+    ctx->is_cached = 1;
+    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                  "### http status: %d ###", ctx->http_status);
 
 out:
     return ngx_http_next_body_filter(r, in);
