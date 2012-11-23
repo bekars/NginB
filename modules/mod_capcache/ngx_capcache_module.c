@@ -16,7 +16,7 @@
 
 #include "ngx_capcache_module.h"
 
-static u_char ngx_capcache_body[] = { '<', 'C', 'A', 'P', 'C', 'A', 'C', 'H', 'E', '>' };
+static u_char ngx_capcache_body[] = { '<', 'C', 'A', 'P', 'C', 'A', 'C', 'H', 'E', '>', LF };
 
 /* capcache config data */
 typedef struct ngx_capcache_loc_conf 
@@ -124,16 +124,77 @@ out:
     return ngx_http_next_header_filter(r);
 }
 
+static void
+ngx_http_file_cache_cleanup_my(void *data)
+{
+    ngx_http_cache_t  *c = data;
+
+    if (c->updated) {
+        return;
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->file.log, 0,
+                   "http file cache cleanup");
+
+    if (c->updating) {
+        ngx_log_error(NGX_LOG_ALERT, c->file.log, 0,
+                      "stalled cache updating, error:%ui", c->error);
+    }
+
+    ngx_http_file_cache_free(c, NULL);
+}
+
+static ngx_int_t
+ngx_http_file_cache_name_my(ngx_http_request_t *r, ngx_path_t *path)
+{
+    u_char            *p;
+    ngx_http_cache_t  *c;
+
+    c = r->cache;
+
+    if (c->file.name.len) {
+        return NGX_OK;
+    }
+
+    c->file.name.len = path->name.len + 1 + path->len
+                       + 2 * NGX_HTTP_CACHE_KEY_LEN;
+
+    c->file.name.data = ngx_pnalloc(r->pool, c->file.name.len + 1);
+    if (c->file.name.data == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(c->file.name.data, path->name.data, path->name.len);
+
+    p = c->file.name.data + path->name.len + 1 + path->len;
+    p = ngx_hex_dump(p, c->key, NGX_HTTP_CACHE_KEY_LEN);
+    *p = '\0';
+
+    ngx_create_hashed_filename(path, c->file.name.data, c->file.name.len);
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "cache file: \"%s\"", c->file.name.data);
+
+    return NGX_OK;
+}
+
 static ngx_int_t
 ngx_capcache_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
 {
+    ngx_int_t rc;
     ngx_http_cache_t *c;
     ngx_http_upstream_t *u;
     ngx_capcache_ctx_t *ctx;
-    u_char *p = NULL;
+    u_char *pbuf = NULL;
     u_char *buf = NULL;
     size_t len;
- 
+    ngx_buf_t buf_to_file;
+    ngx_chain_t chain;
+    ngx_temp_file_t tf;
+    ngx_ext_rename_file_t ext;
+    ngx_file_info_t fi;
+    ngx_pool_cleanup_t *cln;
+
     if (in == NULL) {
         goto out;
     }
@@ -147,7 +208,9 @@ ngx_capcache_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
         goto out;
     }
 
-    /* 1. create buf chain */
+    /**
+     * 1. create buf chain
+     */
     c = r->cache;
     u = r->upstream;
     /* get crc32 & key */
@@ -163,27 +226,83 @@ ngx_capcache_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
         ngx_http_file_cache_create_key(r);
     
         c = r->cache;
+        c->file_cache = u->conf->cache->data;
     }
 
     len = c->header_start + sizeof(ngx_capcache_body);
     buf = ngx_pcalloc(r->pool, len);
     if (buf == NULL) {
-        return NGX_ERROR;
+        goto out;
     }
 
     /* set file header */
+    /* timeout when next request */
     c->valid_sec = ngx_time() - 1;
     ngx_http_file_cache_set_header(r, buf);
-    p = buf + c->header_start;
-    p = ngx_cpymem(p, ngx_capcache_body, sizeof(ngx_capcache_body));
+    pbuf = buf + c->header_start;
+    pbuf = ngx_cpymem(pbuf, ngx_capcache_body, sizeof(ngx_capcache_body));
 
-    p = buf;
-    /* 2. write cache file */
-    //ngx_write_chain_to_temp_file(ngx_temp_file_t *tf, ngx_chain_t *chain)
+    /**
+     * 2. write cache file
+     */
+    ngx_memzero(&buf_to_file, sizeof(ngx_buf_t));
+    buf_to_file.pos = buf;
+    buf_to_file.start = buf;
+    buf_to_file.last = pbuf;
+    buf_to_file.end = pbuf;
+    buf_to_file.memory = 1;
+    buf_to_file.last_buf = 1;
+    chain.buf = &buf_to_file;
+    chain.next = NULL;
+
+    ngx_memzero(&tf, sizeof(ngx_temp_file_t));
+    tf.file.fd = NGX_INVALID_FILE;
+    tf.file.log = r->connection->log;
+    tf.path = u->conf->temp_path;
+    tf.pool = r->pool;
+    tf.persistent = 1;
+    if (ngx_write_chain_to_temp_file(&tf, &chain) == NGX_ERROR) {
+        goto out;
+    }
+ 
+    /**
+     * 3. move cache file
+     */
+    ngx_memzero(&ext, sizeof(ngx_ext_rename_file_t));
+    ext.access = NGX_FILE_OWNER_ACCESS;
+    ext.path_access = NGX_FILE_OWNER_ACCESS;
+    ext.time = -1;
+    ext.create_path = 1;
+    ext.delete_file = 1;
+    ext.log = r->connection->log;
+
+    ngx_http_file_cache_name_my(r, c->file_cache->path); 
+    rc = ngx_ext_rename_file(&tf.file.name, &c->file.name, &ext);
+    if (rc == NGX_OK) {
+        if (ngx_fd_info(tf.file.fd, &fi) == NGX_FILE_ERROR) {
+            ngx_log_error(NGX_LOG_CRIT, r->connection->log, ngx_errno,
+                          ngx_fd_info_n " \"%s\" failed", tf.file.name.data);
+            rc = NGX_ERROR;
+        }
+    }
     
-    /* 3. move cache file */
+    /**
+     * 4. insert into rbtree
+     */
+    //ngx_http_file_cache_add_file(ngx_tree_ctx_t *ctx, ngx_str_t *name)
     
-    /* 4. insert into rbtree */
+
+    /**
+     * 5. clean cache file
+     */
+    cln = ngx_pool_cleanup_add(r->pool, 0);
+    if (cln == NULL) {
+        goto out;
+    }
+
+    cln->handler = ngx_http_file_cache_cleanup_my;
+    cln->data = c;
+
 
     ctx->is_cached = 1;
     ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
