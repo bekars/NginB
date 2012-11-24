@@ -9,6 +9,7 @@ config:
 	cd ${NGX_PATH}; \
 	./configure --with-debug \
 		--with-http_stub_status_module \
+		--add-module=${NGX_MOD_PATH}/mod_breakpoint \
 		--add-module=${NGX_MOD_PATH}/mod_minify \
 		--add-module=${NGX_MOD_PATH}/mod_capcache
 

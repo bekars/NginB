@@ -100,7 +100,7 @@ ngx_module_t ngx_capcache_module = {
 
 extern ngx_module_t ngx_http_proxy_module;
 
-//#if 0
+#if 0
 static ngx_int_t
 ngx_http_proxy_handler_my(ngx_http_request_t *r)
 {
@@ -185,7 +185,7 @@ ngx_http_proxy_handler_my(ngx_http_request_t *r)
 
     return NGX_DONE;
 }
-//#endif
+#endif
 
 static char *
 ngx_capcache_path_conf_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
@@ -212,7 +212,8 @@ ngx_capcache_path_conf_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     clcf = ngx_http_conf_get_module_loc_conf(cf, ngx_http_core_module);
-    clcf->handler = ngx_http_proxy_handler_my;
+    //clcf->handler = ngx_http_proxy_handler_my;
+    clcf->handler = NULL;
 
     return NGX_CONF_OK;
 }
