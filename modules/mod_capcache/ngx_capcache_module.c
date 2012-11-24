@@ -100,28 +100,119 @@ ngx_module_t ngx_capcache_module = {
 
 extern ngx_module_t ngx_http_proxy_module;
 
+//#if 0
+static ngx_int_t
+ngx_http_proxy_handler_my(ngx_http_request_t *r)
+{
+    ngx_int_t                   rc;
+    ngx_http_upstream_t        *u;
+    ngx_http_proxy_ctx_t       *ctx;
+    //ngx_http_proxy_loc_conf_t  *plcf;
+
+    if (ngx_http_upstream_create(r) != NGX_OK) {
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    /*
+    ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_proxy_ctx_t));
+    if (ctx == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_http_set_ctx(r, ctx, ngx_http_proxy_module);
+    */
+
+    plcf = ngx_http_get_module_loc_conf(r, ngx_http_proxy_module);
+
+    u = r->upstream;
+
+    if (plcf->proxy_lengths == NULL) {
+        ctx->vars = plcf->vars;
+        u->schema = plcf->vars.schema;
+#if (NGX_HTTP_SSL)
+        u->ssl = (plcf->upstream.ssl != NULL);
+#endif
+
+    } else {
+        if (ngx_http_proxy_eval(r, ctx, plcf) != NGX_OK) {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+    }
+
+    u->output.tag = (ngx_buf_tag_t) &ngx_http_proxy_module;
+
+    u->conf = &plcf->upstream;
+
+#if (NGX_HTTP_CACHE)
+    u->create_key = ngx_http_proxy_create_key;
+#endif
+    u->create_request = ngx_http_proxy_create_request;
+    u->reinit_request = ngx_http_proxy_reinit_request;
+    u->process_header = ngx_http_proxy_process_status_line;
+    u->abort_request = ngx_http_proxy_abort_request;
+    u->finalize_request = ngx_http_proxy_finalize_request;
+    r->state = 0;
+
+    if (plcf->redirects) {
+        u->rewrite_redirect = ngx_http_proxy_rewrite_redirect;
+    }
+
+    if (plcf->cookie_domains || plcf->cookie_paths) {
+        u->rewrite_cookie = ngx_http_proxy_rewrite_cookie;
+    }
+
+    u->buffering = plcf->upstream.buffering;
+
+    u->pipe = ngx_pcalloc(r->pool, sizeof(ngx_event_pipe_t));
+    if (u->pipe == NULL) {
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    u->pipe->input_filter = ngx_http_proxy_copy_filter;
+    u->pipe->input_ctx = r;
+
+    u->input_filter_init = ngx_http_proxy_input_filter_init;
+    u->input_filter = ngx_http_proxy_non_buffered_copy_filter;
+    u->input_filter_ctx = r;
+
+    u->accel = 1;
+
+    rc = ngx_http_read_client_request_body(r, ngx_http_upstream_init);
+
+    if (rc >= NGX_HTTP_SPECIAL_RESPONSE) {
+        return rc;
+    }
+
+    return NGX_DONE;
+}
+//#endif
+
 static char *
 ngx_capcache_path_conf_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_capcache_loc_conf_t *clcf = conf;
+    ngx_capcache_loc_conf_t *cclcf = conf;
+    ngx_http_core_loc_conf_t *clcf;
 
     ngx_str_t *value;
 
     value = cf->args->elts;
 
-    if (clcf->cache != NGX_CONF_UNSET_PTR) {
+    if (cclcf->cache != NGX_CONF_UNSET_PTR) {
         return "shm cache is exist";
     }
 
     if (ngx_strcmp(value[1].data, "off") == 0) {
-        clcf->cache = NULL;
+        cclcf->cache = NULL;
         return NGX_CONF_OK;
     }
 
-    clcf->cache = ngx_shared_memory_add(cf, &value[1], 0, &ngx_http_proxy_module);
-    if (clcf->cache == NULL) {
+    cclcf->cache = ngx_shared_memory_add(cf, &value[1], 0, &ngx_http_proxy_module);
+    if (cclcf->cache == NULL) {
         return NGX_CONF_ERROR;
     }
+
+    clcf = ngx_http_conf_get_module_loc_conf(cf, ngx_http_core_module);
+    clcf->handler = ngx_http_proxy_handler_my;
 
     return NGX_CONF_OK;
 }
