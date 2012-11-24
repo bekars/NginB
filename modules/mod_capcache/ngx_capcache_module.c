@@ -14,6 +14,10 @@
  * =====================================================================================
  */
 
+#include <ngx_config.h>
+#include <ngx_core.h>
+#include <ngx_http.h>
+
 #include "ngx_capcache_module.h"
 
 static u_char ngx_capcache_body[] = { '<', 'C', 'A', 'P', 'C', 'A', 'C', 'H', 'E', '>', LF };
@@ -22,6 +26,7 @@ static u_char ngx_capcache_body[] = { '<', 'C', 'A', 'P', 'C', 'A', 'C', 'H', 'E
 typedef struct ngx_capcache_loc_conf 
 {
     ngx_flag_t capcache_enable;
+    ngx_shm_zone_t *cache;
 } ngx_capcache_loc_conf_t, *ngx_capcache_loc_conf_p;
 
 typedef struct ngx_capcache_ctx 
@@ -30,23 +35,36 @@ typedef struct ngx_capcache_ctx
     ngx_uint_t is_cached;
 } ngx_capcache_ctx_t, *ngx_capcache_ctx_p;
 
+static ngx_http_output_header_filter_pt  ngx_http_next_header_filter;
+static ngx_http_output_body_filter_pt    ngx_http_next_body_filter;
+
+static void *ngx_capcache_create_loc_conf(ngx_conf_t *cf);
+static char *ngx_capcache_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child);
+static ngx_int_t ngx_capcache_postconfig(ngx_conf_t *cf);
+static char *ngx_capcache_path_conf_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+
 
 static ngx_command_t ngx_capcache_commands[] = {
     { 
         ngx_string("capcache"),
-        NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+        NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
         ngx_conf_set_flag_slot,
         NGX_HTTP_LOC_CONF_OFFSET,
         offsetof(ngx_capcache_loc_conf_t, capcache_enable),
         NULL 
     },
  
+    { 
+        ngx_string("capcache_path"),
+        NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+        ngx_capcache_path_conf_slot,
+        NGX_HTTP_LOC_CONF_OFFSET,
+        0,
+        NULL 
+    },
+ 
     ngx_null_command
 };
-
-static void *ngx_capcache_create_loc_conf(ngx_conf_t *cf);
-static char *ngx_capcache_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child);
-static ngx_int_t ngx_capcache_postconfig(ngx_conf_t *cf);
 
 /* define config init & merge cb function */
 static ngx_http_module_t ngx_capcache_module_ctx = {
@@ -79,8 +97,34 @@ ngx_module_t ngx_capcache_module = {
     NGX_MODULE_V1_PADDING
 };
 
-static ngx_http_output_header_filter_pt  ngx_http_next_header_filter;
-static ngx_http_output_body_filter_pt    ngx_http_next_body_filter;
+
+extern ngx_module_t ngx_http_proxy_module;
+
+static char *
+ngx_capcache_path_conf_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_capcache_loc_conf_t *clcf = conf;
+
+    ngx_str_t *value;
+
+    value = cf->args->elts;
+
+    if (clcf->cache != NGX_CONF_UNSET_PTR) {
+        return "shm cache is exist";
+    }
+
+    if (ngx_strcmp(value[1].data, "off") == 0) {
+        clcf->cache = NULL;
+        return NGX_CONF_OK;
+    }
+
+    clcf->cache = ngx_shared_memory_add(cf, &value[1], 0, &ngx_http_proxy_module);
+    if (clcf->cache == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    return NGX_CONF_OK;
+}
 
 static ngx_int_t
 ngx_capcache_header_filter(ngx_http_request_t *r)
@@ -194,6 +238,7 @@ ngx_capcache_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     ngx_ext_rename_file_t ext;
     ngx_file_info_t fi;
     ngx_pool_cleanup_t *cln;
+    ngx_capcache_loc_conf_t *conf;
 
     if (in == NULL) {
         goto out;
@@ -207,6 +252,8 @@ ngx_capcache_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     if (ctx->is_cached) {
         goto out;
     }
+
+    conf = ngx_http_get_module_loc_conf(r, ngx_capcache_module);
 
     /**
      * 1. create buf chain
@@ -226,7 +273,7 @@ ngx_capcache_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
         ngx_http_file_cache_create_key(r);
     
         c = r->cache;
-        c->file_cache = u->conf->cache->data;
+        c->file_cache = conf->cache->data;
     }
 
     len = c->header_start + sizeof(ngx_capcache_body);
@@ -303,7 +350,13 @@ ngx_capcache_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     cln->handler = ngx_http_file_cache_cleanup_my;
     cln->data = c;
 
+    //ngx_http_file_cache_free(r->cache, tf);
 
+      
+    /* 打开缓存文件 */
+    //if (ngx_open_cached_file(clcf->open_file_cache, &path, &of, r->pool)
+
+    /* flag already done */
     ctx->is_cached = 1;
     ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                   "### http status: %d ###", ctx->http_status);
@@ -336,6 +389,7 @@ ngx_capcache_create_loc_conf(ngx_conf_t *cf)
     }
 
     conf->capcache_enable = NGX_CONF_UNSET;
+    conf->cache = NGX_CONF_UNSET_PTR;
     return conf;
 }
 
