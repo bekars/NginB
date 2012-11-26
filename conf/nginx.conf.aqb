@@ -1,0 +1,117 @@
+user  nobody;
+worker_rlimit_nofile 42767;
+worker_rlimit_core  500M;
+working_directory   /mnt/data/tmp/;
+#worker_processes  4;
+#worker_cpu_affinity 0001 0010 0100 1000;
+
+
+error_log  /usr/local/nginx/logs/error.log;
+#error_log  logs/error.log  notice;
+#error_log  logs/error.log  debug;
+
+#pid        logs/nginx.pid;
+
+events {
+    worker_connections  40000;
+}
+
+
+http {
+    default_type  application/octet-stream;
+    server_names_hash_max_size 2048;
+    server_names_hash_bucket_size 512;
+
+    log_format  main     '$remote_addr - $remote_user [$time_local] "$request" '
+        '$status $body_bytes_sent "$http_referer" '
+        '"$http_user_agent" "$http_x_forwarded_for" "$http_cookie" $upstream_cache_status $request_time $upstream_response_time "$request_body"'; 
+    log_format default '$remote_addr $host $remote_user [$time_local] "$request" '
+        '$status $body_bytes_sent "$http_referer" '
+        '"$http_user_agent" "$http_x_forwarded_for" "$http_cookie" $upstream_cache_status';
+    log_format hotlink '$time_local []hotlink_check^-2^1^$request_method^$http_host^$request_uri^$remote_addr^invalid reference:$http_referer^';
+    log_format extdeny '$time_local []extname_deny^-1^1^$request_method^$http_host^$request_uri^$remote_addr^deny filename extension^';
+
+    access_log  /usr/local/nginx/logs/access.log default;
+    client_max_body_size 20m;
+    client_body_temp_path  /data/nginx/client_body_temp 1;
+    sendfile        on;
+#tcp_nopush     on;
+
+    #keepalive_timeout  0;
+    keepalive_timeout  120;
+    proxy_buffer_size 64k;
+    proxy_max_temp_file_size 5m;
+    proxy_buffers 8 128k;
+    proxy_read_timeout 120;
+
+    #gzip  on;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Host $host; 
+    proxy_set_header X-Forwarded-Server $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_pass_header  Set-Cookie;
+    proxy_cache_methods GET HEAD;
+    proxy_cache_valid 200 302 4h;
+    proxy_cache_key "$scheme:$host$request_uri";
+    proxy_ignore_client_abort on;
+
+    more_set_headers "Powered-By-Anquanbao: $upstream_cache_status_sp from $HOSTNAME";
+    sub_filter <hr><center>ASERVER/1.2.4-3</center> <hr><center>$HOSTNAME/$nginx_version</center>;
+
+    sqlfilter_rule_file /etc/nginx/rule_main.xml;
+
+    server {
+        listen 80;
+        server_name localhost;
+        access_log /usr/local/nginx/logs/access.default.log default;
+        location /status {
+            stub_status on;
+            allow 127.0.0.1;
+            allow 59.151.123.78;
+            deny all;
+        }
+
+        root  /usr/local/lighttpd/htm;
+        index index.html;
+        location /open_url_cost.cgi {
+            #allow 127.0.0.1;
+            #deny all;
+            fastcgi_pass  127.0.0.1:8888;
+            fastcgi_param  QUERY_STRING       $query_string;
+            fastcgi_param  REQUEST_METHOD     $request_method;
+            fastcgi_param  CONTENT_TYPE       $content_type;
+            fastcgi_param  CONTENT_LENGTH     $content_length;
+
+            fastcgi_param  SCRIPT_NAME        $fastcgi_script_name;
+            fastcgi_param  REQUEST_URI        $request_uri;
+            fastcgi_param  DOCUMENT_URI       $document_uri;
+            fastcgi_param  DOCUMENT_ROOT      $document_root;
+            fastcgi_param  SERVER_PROTOCOL    $server_protocol;
+
+            fastcgi_param  GATEWAY_INTERFACE  CGI/1.1;
+            fastcgi_param  SERVER_SOFTWARE    nginx/$nginx_version;
+
+            fastcgi_param  REMOTE_ADDR        $remote_addr;
+            fastcgi_param  REMOTE_PORT        $remote_port;
+            fastcgi_param  SERVER_ADDR        $server_addr;
+            fastcgi_param  SERVER_PORT        $server_port;
+            fastcgi_param  SERVER_NAME        $server_name;
+            fastcgi_param  REDIRECT_STATUS    200;
+        }
+
+        location = /200k.jpg {
+            expires -1;
+            add_header Cache-Control private;
+            add_header Last-Modified 0;
+            root /usr/local/nginx;
+        }
+
+        location ~ ^/(405_1.png|405_2.png|tele_405_1.png)$ {
+            root /usr/local/nginx/;             
+        }
+    }
+    chunkin on;
+    include  /etc/nginx/proxy/*;
+}
+

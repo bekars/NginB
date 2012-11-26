@@ -55,9 +55,16 @@ cache_header_show(char *fname, int isshow)
 }
 
 int
-cache_header_modify(char *expired, char *fname, ngx_http_file_cache_header_t *cache_header)
+cache_header_bodyoffset_modify(char *bodyoffset, ngx_http_file_cache_header_t *cache_header)
 {
-    FILE *fp = NULL;
+    cache_header->body_start = atoi(bodyoffset);
+
+    return 0;
+}
+
+int
+cache_header_expired_modify(char *expired, ngx_http_file_cache_header_t *cache_header)
+{
     int secs;
     char ope;
 //    char new_file[1024];
@@ -75,7 +82,13 @@ cache_header_modify(char *expired, char *fname, ngx_http_file_cache_header_t *ca
     }
 
 //    sprintf(new_file, "%s.new", fname);
+    return 0;
+}
 
+int
+update_cache_file(char *fname, ngx_http_file_cache_header_t *cache_header)
+{
+    FILE *fp = NULL;
     fp = fopen(fname, "rb+");
     if (!fp) {
         printf("file %s open error!\n", fname);
@@ -95,14 +108,22 @@ cache_header_modify(char *expired, char *fname, ngx_http_file_cache_header_t *ca
 int
 main(int argc, char **argv)
 {
-    if ((argc != 2) && (argc != 3)) {
-        printf("Usage: %s <cache_file_name> +<expired_seconds(optinal)>\n", argv[0]);
+    if ((argc < 2) || (argc > 4)) {
+        printf("Usage: %s <cache_file_name> +<expired_seconds(optinal)> <body_offset>\n", argv[0]);
         exit(-1);
     }
 
     if (argc == 3) {
         cache_header_show(argv[1], 0);
-        cache_header_modify(argv[2], argv[1], &cache_header);
+        cache_header_expired_modify(argv[2], &cache_header);
+        update_cache_file(argv[1], &cache_header);
+    }
+
+    if (argc == 4) {
+        cache_header_show(argv[1], 0);
+        cache_header_expired_modify(argv[2], &cache_header);
+        cache_header_bodyoffset_modify(argv[3], &cache_header);
+        update_cache_file(argv[1], &cache_header);
     }
  
     cache_header_show(argv[1], 1);
