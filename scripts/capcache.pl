@@ -7,7 +7,7 @@ my $startime = new Benchmark;
 my $logfile = "www.domain.com_80.log";
 
 #
-# Rate - 各种头域出现的比率
+# Rate - 各种头域出现的比率，整体的和未缓存的
 # MISS Res - 未命中缓存资源
 # No-Cache Res - 未缓存资源 ==> log
 #
