@@ -4,7 +4,7 @@ use strict;
 use Benchmark;
 use Getopt::Std;
 use Data::Dumper;
-use Time::Interval;
+#use Time::Interval;
 
 my %options = ();
 my $startime = new Benchmark;
@@ -108,6 +108,9 @@ sub nocache_analysis_mod
         ($node_h->{http_sufix} ne "")) {
         $nocache_http_sufix_h{"." . "$node_h->{http_sufix}"} += 1;
         $nocache_http_sufix_h{".$node_h->{http_sufix}" . "_FLOW"} += $node_h->{http_len};
+    } else {
+        $nocache_http_sufix_h{".NOSUFIX"} += 1;
+        $nocache_http_sufix_h{".NOSUFIX_FLOW"} += $node_h->{http_len};
     }
 }
 
@@ -136,6 +139,8 @@ sub analysis_url
         if ($http_uri =~ m/(.*?)\?(.*)/) {
             $http_url = $1;
             $http_arg = $2;
+        } else {
+            $http_url = $http_uri;
         }
     }
 
@@ -171,7 +176,7 @@ my $log_reg = qr/.*?\[(?# TIME)(.*?)\]\s+\"(?# URI)(.*?)\"\s+(?# HTTP_STATUS)(.*
 
 sub analysis
 {
-    my ($log_data_a, $domain) = @_;
+    my ($log_data_a, $domain, $log) = @_;
 
     #print(join "|", @$log_data_a);
     #print("\n\n");
@@ -180,6 +185,7 @@ sub analysis
  
     my %node_h = (
         domain          => $domain,
+        log             => $log,
         time            => $log_data_a->[0],
         http_method     => $http_method,
         http_url        => $http_url,
@@ -245,7 +251,7 @@ sub parse_log
         my @line = ($_ =~ m/$reg/);
         if ($#line > 0) {
             ## analysis ########
-            &{$func}(\@line, $domain);
+            &{$func}(\@line, $domain, $_);
         } else {
             printf("ERR: line regex error!\n");
             printf("    $_\n");
