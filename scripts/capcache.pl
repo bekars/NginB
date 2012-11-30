@@ -152,6 +152,8 @@ sub analysis_url
         }
     }
 
+    $http_sufix =~ tr/A-Z/a-z/;
+
     push(@ret_a, $http_method);
     push(@ret_a, $http_url);
     push(@ret_a, $http_arg);
