@@ -12,10 +12,27 @@ my $startime = new Benchmark;
 my $file_format = "access_%s_80.log.%s.gz";
 my $home_dir = "/usr/local/apache2/logs/";
 
+sub show_hash
+{
+    my ($hash, $name) = @_;
+    my $key;
+
+    if (!defined($name)) {
+        $name = "%HASH";
+    }
+
+    printf("%$name = {\n");
+    foreach $key (sort keys %$hash) {
+        printf("       '$key' => $hash->{$key},\n");
+    }
+    printf("};\n");
+}
+
 #
 # analysis cache resource
 #
 my %cache_http_hit_h = ();
+my %cache_http_status_h = ();
 
 sub cache_analysis_mod
 {
@@ -24,18 +41,27 @@ sub cache_analysis_mod
         return;
     }
 
-    if ($node_h->{cache_status} eq "-") {
+    if (($node_h->{cache_status} eq "-") ||
+        ($node_h->{cache_status} eq "")) {
         return;
     }
     
     $cache_http_hit_h{$node_h->{cache_status}} += 1;
+    $cache_http_hit_h{TOTAL} += 1;
+    $cache_http_hit_h{"$node_h->{cache_status}" . "_FLOW"} += $node_h->{http_len};
+    $cache_http_hit_h{TOTAL_FLOW} += $node_h->{http_len};
+    $cache_http_status_h{$node_h->{http_status}} += 1;
+    $cache_http_status_h{TOTAL} += 1;
+    $cache_http_status_h{"$node_h->{http_status}" . "_FLOW"} += $node_h->{http_len};
+    $cache_http_status_h{TOTAL_FLOW} += $node_h->{http_len};
 }
 
 #
 # analysis no-cache resource
 #
 my %nocache_http_status_h = ();
-my %nocache_http_cache_h = ();
+my %nocache_http_header_h = ();
+my %nocache_http_sufix_h = ();
 
 sub nocache_analysis_mod
 {
@@ -44,26 +70,44 @@ sub nocache_analysis_mod
         return;
     }
 
-    if ($node_h->{cache_status} ne "-") {
+    if (($node_h->{cache_status} ne "-") &&
+        ($node_h->{cache_status} ne "")) {
         return;
     }
     
     $nocache_http_status_h{$node_h->{http_status}} += 1;
+    $nocache_http_status_h{TOTAL} += 1;
+    $nocache_http_status_h{"$node_h->{http_status}" . "_FLOW"} += $node_h->{http_len};
+    $nocache_http_status_h{TOTAL_FLOW} += $node_h->{http_len};
 
-    if ($node_h->{http_etag} ne "-") {
-        $nocache_http_cache_h{http_etag} += 1;
+    if (($node_h->{http_etag} ne "-") &&
+        ($node_h->{http_etag} ne "")) {
+        $nocache_http_header_h{http_etag} += 1;
+        $nocache_http_header_h{http_etag_FLOW} += $node_h->{http_len};
     }
     
-    if ($node_h->{http_lastmodify} ne "-") {
-        $nocache_http_cache_h{http_lastmodify} += 1;
+    if (($node_h->{http_lastmodify} ne "-") &&
+        ($node_h->{http_lastmodify} ne "")) {
+        $nocache_http_header_h{http_lastmodify} += 1;
+        $nocache_http_header_h{http_lastmodify_FLOW} += $node_h->{http_len};
     }
     
-    if ($node_h->{cache_control} ne "-") {
-        $nocache_http_cache_h{cache_control} += 1;
+    if (($node_h->{cache_control} ne "-") &&
+        ($node_h->{cache_control} ne "")) {
+        $nocache_http_header_h{cache_control} += 1;
+        $nocache_http_header_h{cache_control_FLOW} += $node_h->{http_len};
     }
     
-    if ($node_h->{cache_expired} ne "-") {
-        $nocache_http_cache_h{cache_expired} += 1;
+    if (($node_h->{cache_expired} ne "-") &&
+        ($node_h->{cache_expired} ne "")) {
+        $nocache_http_header_h{cache_expired} += 1;
+        $nocache_http_header_h{cache_expired_FLOW} += $node_h->{http_len};
+    }
+    
+    if (($node_h->{http_sufix} ne "-") &&
+        ($node_h->{http_sufix} ne "")) {
+        $nocache_http_sufix_h{"." . "$node_h->{http_sufix}"} += 1;
+        $nocache_http_sufix_h{".$node_h->{http_sufix}" . "_FLOW"} += $node_h->{http_len};
     }
 }
 
@@ -123,14 +167,14 @@ sub analysis_url
 # domain time url status length cache-status expired cache-control etag last-modified
 #
 #                     1           2         3       4                                                           5         6           7           8           9
-my $log_reg = qr/.*?\[(.*?)\].*?\"(.*?)\"\s+(.*?)\s+(.*?)\s+\"[^\"]+\"\s+\"[^\"]+\"\s+\"[^\"]+\"\s+\"[^\"]+\"\s+(.*?)\s+\"(.*?)\"\s+\"(.*?)\"\s+\"(.*?)\"\s+\"(.*?)\"\s+.*/;
+my $log_reg = qr/.*?\[(.*?)\]\s+\"(.*?)\"\s+(.*?)\s+(.*?)\s+\"[^\"]*\"\s+\"[^\"]*\"\s+\"[^\"]*\"\s+\"[^\"]*\"\s+(.*?)\s+\"(.*?)\"\s+\"(.*?)\"\s+\"(.*?)\"\s+\"(.*?)\"\s+.*/;
 
 sub analysis
 {
     my ($log_data_a, $domain) = @_;
 
-    print(join "|", @$log_data_a);
-    print("\n\n");
+    #print(join "|", @$log_data_a);
+    #print("\n\n");
 
     my ($http_method, $http_url, $http_arg, $http_sufix) = analysis_url($log_data_a->[1]);
  
@@ -197,13 +241,13 @@ sub parse_log
     open(FILEHANDLE, $tmpfile) or do_exit("Can not open file $tmpfile!");
 
     while (<FILEHANDLE>) {
-        #print("$_");
         my @line = ($_ =~ m/$reg/);
         if ($#line > 0) {
             ## analysis ########
             &{$func}(\@line, $domain);
         } else {
-            print("Expr error!\n");
+            printf("ERR: line regex error!\n");
+            printf("    $_\n");
         }
     }
 
@@ -248,6 +292,7 @@ sub usage
     print("Usage: \n" . 
           "    -t <date>        date example 20121129\n" .
           "    -d <dir>         logs directory\n" .
+          "    -f <logfile>     analysis log file\n" .
           "    -T               benchmark\n" .
           "    -D               debug mode\n" .
           "    -h               for help\n");
@@ -255,27 +300,37 @@ sub usage
 }
 
 
-getopts('t:d:hTD', \%options);
-if (exists($options{h}) || !exists($options{t})) {
+getopts('t:d:f:hTD', \%options);
+if (exists($options{h})) {
     usage();
 }
 
-if (exists($options{d})) {
-    $home_dir = $options{d};
+if (exists($options{f})) {
+    -e $options{f} or do_exit("ERR: no find file $options{f}!");
+
+    if ($options{f} =~ m/.*?access_(.*?)_.*/i) {
+        printf("Analysis $1 Log File: $options{f} ...\n\n");
+        ## parse_log ########
+        parse_log($options{f}, \&analysis, $log_reg, $1);
+    }
+} else {
+    if (!exists($options{t})) {
+        usage();
+    }
+
+    if (exists($options{d})) {
+        $home_dir = $options{d};
+    }
+
+    walk_dir($home_dir, "log.$options{t}", \&parse_log);
 }
 
-walk_dir($home_dir, "log.$options{t}", \&parse_log);
+show_hash(\%cache_http_hit_h, "CACHE_HIT");
+show_hash(\%cache_http_status_h, "CACHE_STATUS");
+show_hash(\%nocache_http_status_h, "NOCACHE_STATUS");
+show_hash(\%nocache_http_header_h, "NOCACHE_HEADER");
+show_hash(\%nocache_http_sufix_h, "NOCACHE_SUFIX");
 
-
-printf(Dumper \%cache_http_hit_h);
-printf(Dumper \%nocache_http_status_h);
-printf(Dumper \%nocache_http_cache_h);
-
-=pod
-
-parse_log("/tmp/" . $logfile, \&analysis, $log_reg);
-
-=cut
 
 if (exists($options{T})) {
     printf "\n\n### %s ###\n\n", timestr(timediff(new Benchmark, $startime));
