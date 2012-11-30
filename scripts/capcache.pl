@@ -15,7 +15,7 @@ my $home_dir = "/usr/local/apache2/logs/";
 #
 # analysis cache resource
 #
-my %cache_http_hit = ();
+my %cache_http_hit_h = ();
 
 sub cache_analysis_mod
 {
@@ -28,7 +28,7 @@ sub cache_analysis_mod
         return;
     }
     
-    $cache_http_hit{$node_h->{cache_status}} += 1;
+    $cache_http_hit_h{$node_h->{cache_status}} += 1;
 }
 
 #
@@ -267,6 +267,7 @@ if (exists($options{d})) {
 walk_dir($home_dir, "log.$options{t}", \&parse_log);
 
 
+printf(Dumper \%cache_http_hit_h);
 printf(Dumper \%nocache_http_status_h);
 printf(Dumper \%nocache_http_cache_h);
 
