@@ -6,38 +6,64 @@ use Getopt::Std;
 use Data::Dumper;
 use Time::Interval;
 
+my %options = ();
 my $startime = new Benchmark;
 
 my $file_format = "access_%s_80.log.%s.gz";
 my $home_dir = "/usr/local/apache2/logs/";
 
-my %http_status_h = ();
-my %http_cache_h = ();
+#
+# analysis cache resource
+#
+my %cache_http_hit = ();
 
-sub nocache_counter_mod
+sub cache_analysis_mod
 {
     my $node_h = shift;
+    if (!defined($node_h)) {
+        return;
+    }
+
+    if ($node_h->{cache_status} eq "-") {
+        return;
+    }
+    
+    $cache_http_hit{$node_h->{cache_status}} += 1;
+}
+
+#
+# analysis no-cache resource
+#
+my %nocache_http_status_h = ();
+my %nocache_http_cache_h = ();
+
+sub nocache_analysis_mod
+{
+    my $node_h = shift;
+    if (!defined($node_h)) {
+        return;
+    }
 
     if ($node_h->{cache_status} ne "-") {
         return;
     }
     
-    $http_status_h{$node_h->{http_status}} += 1;
+    $nocache_http_status_h{$node_h->{http_status}} += 1;
 
-    if ($node_h->{http_etag} ne "") {
-        $http_cache_h{http_etag} += 1;
+    if ($node_h->{http_etag} ne "-") {
+        $nocache_http_cache_h{http_etag} += 1;
     }
     
-    if ($node_h->{http_lastmodify} ne "") {
-        $http_cache_h{http_lastmodify} += 1;
+    if ($node_h->{http_lastmodify} ne "-") {
+        $nocache_http_cache_h{http_lastmodify} += 1;
     }
     
-    if ($node_h->{cache_control} ne "") {
-        $http_cache_h{cache_control} += 1;
+    if ($node_h->{cache_control} ne "-") {
+        $nocache_http_cache_h{cache_control} += 1;
     }
     
-    if ($node_h->{cache_expired} ne "") {
-        $http_cache_h{cache_expired} += 1;
+    if ($node_h->{cache_expired} ne "-") {
+        $nocache_http_cache_h{cache_expired} += 1;
     }
 }
 
@@ -124,8 +150,11 @@ sub analysis
         http_lastmodify => $log_data_a->[8],
     );
     
-    dump_mod(\%node_h);
-    nocache_counter_mod(\%node_h);
+    if (exists($options{D})) {
+        dump_mod(\%node_h);
+    }
+    nocache_analysis_mod(\%node_h);
+    cache_analysis_mod(\%node_h);
 }
 
 sub unzip_tmpfile
@@ -217,14 +246,16 @@ sub do_exit
 sub usage
 {
     print("Usage: \n" . 
-          "    -t <date>      date example 20121129\n" .
-          "    -h             for help\n");
+          "    -t <date>        date example 20121129\n" .
+          "    -d <dir>         logs directory\n" .
+          "    -T               benchmark\n" .
+          "    -D               debug mode\n" .
+          "    -h               for help\n");
     exit();
 }
 
 
-my %options = ();
-getopts('t:d:hT', \%options);
+getopts('t:d:hTD', \%options);
 if (exists($options{h}) || !exists($options{t})) {
     usage();
 }
@@ -236,8 +267,8 @@ if (exists($options{d})) {
 walk_dir($home_dir, "log.$options{t}", \&parse_log);
 
 
-printf(Dumper \%http_status_h);
-printf(Dumper \%http_cache_h);
+printf(Dumper \%nocache_http_status_h);
+printf(Dumper \%nocache_http_cache_h);
 
 =pod
 
