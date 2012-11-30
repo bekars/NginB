@@ -167,7 +167,7 @@ sub analysis_url
 # domain time url status length cache-status expired cache-control etag last-modified
 #
 #                     1           2         3       4                                                           5         6           7           8           9
-my $log_reg = qr/.*?\[(.*?)\]\s+\"(.*?)\"\s+(.*?)\s+(.*?)\s+\"[^\"]*\"\s+\"[^\"]*\"\s+\"[^\"]*\"\s+\"[^\"]*\"\s+(.*?)\s+\"(.*?)\"\s+\"(.*?)\"\s+\"(.*?)\"\s+\"(.*?)\"\s+.*/;
+my $log_reg = qr/.*?\[(?# TIME)(.*?)\]\s+\"(?# URI)(.*?)\"\s+(?# HTTP_STATUS)(.*?)\s+(?# HTTP_LEN)(.*?)\s+\"[^\"]*\"\s+\"[^\"]*\"\s+\"[^\"]*\"\s+\"[^\"]*\"\s+(?# CACHE_STATUS)(.*?)\s+\"(?# EXPIRED)(.*?)\"\s+\"(?# CACHE_CONTROL)(.*?)\"\s+\"(?# ETAG)(.*?)\"\s+\"(?# LAST_MODIFIED)(.*?)\"\s+.*/;
 
 sub analysis
 {
@@ -215,8 +215,9 @@ sub unzip_tmpfile
         return;
     }
 
+    $zipfile =~ s/\*/\\\*/;
     if ($zipfile =~ m/(.*)\.(.*)/) {
-        if ($2 == "gz") {
+        if ($2 eq "gz") {
             system("gunzip -c $zipfile > /tmp/$tmpfile");
         } else {
             system("cp $zipfile /tmp/$tmpfile");
