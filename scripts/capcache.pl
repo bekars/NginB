@@ -256,8 +256,7 @@ sub parse_log
             ## analysis ########
             &{$func}(\@line, $domain, $_);
         } else {
-            printf("ERR: line regex error!\n");
-            printf("    $_\n");
+            printf("ERR: line regex: $_\n");
         }
     }
 

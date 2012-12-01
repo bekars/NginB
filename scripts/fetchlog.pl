@@ -45,7 +45,8 @@ sub run_sql
     my ($start, $end, $cb) = @_;
     $dbh = DBI->connect("$driver:database=$dbname;host=$dbhost;user=$dbuser;password=$dbpass;port=$dbport") or do_exit("ConnDB err: " . DBI->errstr);
 
-    my $sql = "select type,site,path from logs where begin>$start and end<$end order by begin limit 100";
+    my $sql = "select type,site,path from logs where begin>$start and end<$end order by begin";
+    #my $sql = "select type,site,path from logs where begin>$start and end<$end order by begin limit 100";
     my $sth = $dbh->prepare($sql);
     my $cnt = 1;
 
