@@ -51,8 +51,8 @@ sub run_sql
     #my $sql = "select site,path from logs where type=1 and begin>$start and end<$end order by begin limit 100";
     my $sql_cnt = "select count(*) from logs where type=1 and begin>$start and end<$end order by begin";
     
-    printf("RunSQL: $sql\n");
-
+    printf("### RunSQL: $sql\n");
+    
     my $sth = $dbh->prepare($sql_cnt);
     $sth->execute() or do_exit("SQL err: " . $sth->errstr);
     my ($total) = $sth->fetchrow_array;
@@ -80,6 +80,8 @@ sub get_log_time
     if ($date =~ m/(.{4})(.{2})(.{2})/) {
         my $start = `date +%s -d'$1-$2-$3 00:00:00'`;
         my $end = `date +%s -d'$1-$2-$3 23:59:59'`;
+        $start =~ s/\n//;
+        $end =~ s/\n//;
         push(@ret, $start);
         push(@ret, $end);
         return @ret;
