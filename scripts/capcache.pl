@@ -9,7 +9,6 @@ use Data::Dumper;
 my %options = ();
 my $startime = new Benchmark;
 
-my $file_format = "access_%s_80.log.%s.gz";
 my $home_dir = "/usr/local/apache2/logs/";
 
 sub show_hash
