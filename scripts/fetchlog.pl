@@ -45,15 +45,17 @@ sub run_sql
     my ($start, $end, $cb) = @_;
     $dbh = DBI->connect("$driver:database=$dbname;host=$dbhost;user=$dbuser;password=$dbpass;port=$dbport") or do_exit("ConnDB err: " . DBI->errstr);
 
-    my $sql = "select type,site,path from logs where begin>$start and end<$end order by begin";
-    #my $sql = "select type,site,path from logs where begin>$start and end<$end order by begin limit 100";
+    my $sql = "select site,path from logs where type=1 and begin>$start and end<$end order by begin";
+    #my $sql = "select site,path from logs where type=1 and begin>$start and end<$end order by begin limit 100";
     my $sth = $dbh->prepare($sql);
     my $cnt = 1;
 
+    printf("RunSQL: $sql\n");
+
     $sth->execute() or do_exit("SQL err: " . $sth->errstr);
-    while (my ($type, $site, $path) = $sth->fetchrow_array) {
-        if (($type eq "1") and ($path ne "/")) {
-            print "$cnt => $type $site $path\n";
+    while (my ($site, $path) = $sth->fetchrow_array) {
+        if ($path ne "/") {
+            print "$cnt => $site $path\n";
             $cnt += 1;
             &{$cb}($site, $path);
         }
