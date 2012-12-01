@@ -109,14 +109,9 @@ printf("Start: " . `date -d \@$start_time` . "  End: " . `date -d \@$end_time` .
 
 ## get date log trackers ########
 load_dbconfig();
-    
 run_sql($start_time, $end_time, \&fetch_log);
 
-
-#
-# get every domain logs
-#
-
-
-
+if (exists($options{T})) {
+    printf "\n\n### %s ###\n\n", timestr(timediff(new Benchmark, $startime));
+}
 
