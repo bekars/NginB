@@ -13,6 +13,9 @@ my $driver   = "DBI:mysql";
 my $dbh;
 my ($dbhost, $dbuser, $dbpass, $dbname, $dbport);
 
+my $log_dir = "./LOGS";
+my $log_date;
+my $fdfs_cmd = "/opt/nevel/fdfs-file-zcat/bin/fdfs-file-zcat /etc/fdfs/client.conf";
 
 sub do_exit
 {
@@ -33,7 +36,8 @@ sub fetch_log
 {
     my ($site, $path) = @_;
             
-    print "Fetch log: $site $path\n";
+    my $out_file = "$log_dir/access_$site.log.$date";
+    print "$fdfs_cmd >> $out_file\n";
 }
 
 sub run_sql
@@ -64,8 +68,8 @@ sub get_log_time
     my @ret;
 
     if ($date =~ m/(.{4})(.{2})(.{2})/) {
-        my $start = system("date +%s -d'$1-$2-$3 00:00:00'");
-        my $end = system("date +%s -d'$1-$2-$3 23:59:59'");
+        my $start = `date +%s -d'$1-$2-$3 00:00:00'`;
+        my $end = `date +%s -d'$1-$2-$3 23:59:59'`;
         push(@ret, $start);
         push(@ret, $end);
         return @ret;
@@ -92,7 +96,16 @@ getopts('t:d:hTD', \%options);
 if (exists($options{h}) || !exists($options{t})) {
     usage();
 }
-my ($start_time, $end_time) = get_log_time($options{t});
+
+if (exists($options{d})) {
+    $log_dir = $options{d};
+}
+
+(-e $log_dir) or mkdir($log_dir);
+
+$log_date = $options{t};
+my ($start_time, $end_time) = get_log_time($log_date);
+printf("Start: " . `date -d \@$start_time` . "  End: " . `date -d \@$end_time` . "\n\n");
 
 ## get date log trackers ########
 load_dbconfig();
