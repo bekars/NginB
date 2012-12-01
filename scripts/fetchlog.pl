@@ -37,7 +37,7 @@ sub fetch_log
     my ($site, $path) = @_;
             
     my $out_file = "$log_dir/access_$site.log.$log_date";
-    print "$fdfs_cmd >> $out_file\n";
+    system("$fdfs_cmd $path >> $out_file");
 }
 
 sub run_sql
