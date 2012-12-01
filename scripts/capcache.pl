@@ -223,17 +223,19 @@ sub unzip_tmpfile
         return;
     }
 
+    my $zipfile_org = $zipfile;
     $zipfile =~ s/\*/\\\*/;
     if ($zipfile =~ m/(.*)\.(.*)/) {
         if ($2 eq "gz") {
             system("gunzip -c $zipfile > /tmp/$tmpfile");
         } else {
-            system("cp $zipfile /tmp/$tmpfile");
+            #system("cp -f $zipfile /tmp/$tmpfile");
+            return $zipfile_org;
         }
     } else {
         return;
     }
-    
+ 
     return "/tmp/$tmpfile";
 }
 
@@ -261,8 +263,6 @@ sub parse_log
     }
 
     close(FILEHANDLE);
-
-    unlink($tmpfile);
 }
 
 sub walk_dir
