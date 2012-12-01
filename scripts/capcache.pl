@@ -256,7 +256,9 @@ sub parse_log
             ## analysis ########
             &{$func}(\@line, $domain, $_);
         } else {
-            printf("ERR: line regex: $_\n");
+            if (exists($options{D})) {
+                printf("ERR: line regex: $_\n");
+            }
         }
     }
 
@@ -269,6 +271,8 @@ sub walk_dir
     if (!defined($dir)) {
         return;
     }
+
+    my $cnt = 0;
     
     if (!defined($sufix)) {
         $sufix = ".*";
@@ -279,7 +283,8 @@ sub walk_dir
     my @file_a = readdir(DIRHANDLE);
     for my $i (0..$#file_a) {
         if ($file_a[$i] =~ m/access_(.*?)_80\.$sufix(|\.gz)$/i) {
-            printf("Analysis $1 Log File: $file_a[$i] ...\n\n");
+            $cnt += 1;
+            printf("Analysis $cnt $1 Log File: $file_a[$i] ...\n\n");
             ## parse_log ########
             &{$cbfunc}("$dir/$file_a[$i]", \&analysis, $log_reg, $1);
         }
