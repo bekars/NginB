@@ -44,20 +44,20 @@ sub run_sql
 {
     my ($start, $end, $cb) = @_;
     my $cnt = 1;
-    my $total;
 
     $dbh = DBI->connect("$driver:database=$dbname;host=$dbhost;user=$dbuser;password=$dbpass;port=$dbport") or do_exit("ConnDB err: " . DBI->errstr);
 
     my $sql = "select site,path from logs where type=1 and begin>$start and end<$end order by begin";
     #my $sql = "select site,path from logs where type=1 and begin>$start and end<$end order by begin limit 100";
     my $sql_cnt = "select count(*) from logs where type=1 and begin>$start and end<$end order by begin";
+    
+    printf("RunSQL: $sql\n");
+
     my $sth = $dbh->prepare($sql_cnt);
     $sth->execute() or do_exit("SQL err: " . $sth->errstr);
-    while (($total) = $sth->fetchrow_array) {
-    }
+    my ($total) = $sth->fetchrow_array;
     $sth->finish();
 
-    printf("RunSQL: $sql\n");
     $sth = $dbh->prepare($sql);
     $sth->execute() or do_exit("SQL err: " . $sth->errstr);
     while (my ($site, $path) = $sth->fetchrow_array) {
