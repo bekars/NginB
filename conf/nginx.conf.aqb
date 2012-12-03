@@ -1,8 +1,8 @@
-user  nobody;
+#user  nobody;
 worker_rlimit_nofile 42767;
-worker_rlimit_core  500M;
-working_directory   /mnt/data/tmp/;
-#worker_processes  4;
+worker_rlimit_core   500M;
+working_directory    /tmp/;
+worker_processes  1;
 #worker_cpu_affinity 0001 0010 0100 1000;
 
 
@@ -24,7 +24,9 @@ http {
 
     log_format  main     '$remote_addr - $remote_user [$time_local] "$request" '
         '$status $body_bytes_sent "$http_referer" '
-        '"$http_user_agent" "$http_x_forwarded_for" "$http_cookie" $upstream_cache_status $request_time $upstream_response_time "$request_body"'; 
+        '"$http_user_agent" "$http_x_forwarded_for" "$http_cookie" $upstream_cache_status '
+        '"$upstream_http_expires" "$upstream_http_cache_control" "$upstream_http_etag" "$upstream_http_last_modified" '
+        '$request_time $upstream_response_time "$request_body"'; 
     log_format default '$remote_addr $host $remote_user [$time_local] "$request" '
         '$status $body_bytes_sent "$http_referer" '
         '"$http_user_agent" "$http_x_forwarded_for" "$http_cookie" $upstream_cache_status';
@@ -35,16 +37,16 @@ http {
     client_max_body_size 20m;
     client_body_temp_path  /data/nginx/client_body_temp 1;
     sendfile        on;
-#tcp_nopush     on;
+#   tcp_nopush     on;
 
-    #keepalive_timeout  0;
+#keepalive_timeout  0;
     keepalive_timeout  120;
     proxy_buffer_size 64k;
     proxy_max_temp_file_size 5m;
     proxy_buffers 8 128k;
     proxy_read_timeout 120;
 
-    #gzip  on;
+#gzip  on;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-Host $host; 
@@ -56,10 +58,10 @@ http {
     proxy_cache_key "$scheme:$host$request_uri";
     proxy_ignore_client_abort on;
 
-    more_set_headers "Powered-By-Anquanbao: $upstream_cache_status_sp from $HOSTNAME";
-    sub_filter <hr><center>ASERVER/1.2.4-3</center> <hr><center>$HOSTNAME/$nginx_version</center>;
+#    more_set_headers "Powered-By-Anquanbao: $upstream_cache_status_sp from $HOSTNAME";
+#    sub_filter <hr><center>ASERVER/1.2.4-3</center> <hr><center>$HOSTNAME/$nginx_version</center>;
 
-    sqlfilter_rule_file /etc/nginx/rule_main.xml;
+#    sqlfilter_rule_file /etc/nginx/rule_main.xml;
 
     server {
         listen 80;
@@ -75,8 +77,8 @@ http {
         root  /usr/local/lighttpd/htm;
         index index.html;
         location /open_url_cost.cgi {
-            #allow 127.0.0.1;
-            #deny all;
+#allow 127.0.0.1;
+#deny all;
             fastcgi_pass  127.0.0.1:8888;
             fastcgi_param  QUERY_STRING       $query_string;
             fastcgi_param  REQUEST_METHOD     $request_method;
@@ -111,7 +113,8 @@ http {
             root /usr/local/nginx/;             
         }
     }
-    chunkin on;
-    include  /etc/nginx/proxy/*;
+
+#    chunkin on;
+    include /usr/local/nginx/conf/proxy/*;
 }
 
