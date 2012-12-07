@@ -56,6 +56,62 @@ sub cache_analysis_mod
 }
 
 #
+# analysis html resource
+#
+my %html_http_header_h = ();
+
+sub analysis_html_mod
+{
+    my $node_h = shift;
+    if (!defined($node_h)) {
+        return;
+    }
+
+    my $hflag = 0;
+
+    if (($node_h->{http_etag} ne "-") &&
+        ($node_h->{http_etag} ne "")) {
+        $hflag = 1;
+        $html_http_header_h{http_etag} += 1;
+        $html_http_header_h{http_etag_FLOW} += $node_h->{http_len};
+    }
+    
+    if (($node_h->{http_lastmodify} ne "-") &&
+        ($node_h->{http_lastmodify} ne "")) {
+        $hflag = 1;
+        $html_http_header_h{http_lastmodify} += 1;
+        $html_http_header_h{http_lastmodify_FLOW} += $node_h->{http_len};
+    }
+    
+    if (($node_h->{cache_control} ne "-") &&
+        ($node_h->{cache_control} ne "")) {
+        $hflag = 1;
+        $html_http_header_h{cache_control} += 1;
+        $html_http_header_h{cache_control_FLOW} += $node_h->{http_len};
+    }
+    
+    if (($node_h->{cache_expired} ne "-") &&
+        ($node_h->{cache_expired} ne "")) {
+        $hflag = 1;
+        $html_http_header_h{cache_expired} += 1;
+        $html_http_header_h{cache_expired_FLOW} += $node_h->{http_len};
+    }
+    
+    $html_http_header_h{TOTAL} += 1;
+    $html_http_header_h{TOTAL_FLOW} += $node_h->{http_len};
+
+    #
+    # 统计
+    # 1. 可以缓存的html流量
+    # 2. 首页可以缓存的流量
+    # 3. 超时时间统计
+    #
+    if ($hflag == 1) {
+        printf("URL: $node_h->{http_url} || $node_h->{http_etag} || $node_h->{http_lastmodify} || $node_h->{cache_control} || $node_h->{cache_expired}\n");
+    }
+}
+
+#
 # analysis no-cache resource
 #
 my %nocache_http_status_h = ();
@@ -111,6 +167,13 @@ sub nocache_analysis_mod
         $nocache_http_sufix_h{".NOSUFIX"} += 1;
         $nocache_http_sufix_h{".NOSUFIX_FLOW"} += $node_h->{http_len};
     }
+
+    if (($node_h->{http_sufix} eq "htm") ||
+        ($node_h->{http_sufix} eq "html") ||
+        ($node_h->{http_sufix} eq "/") ||
+        ($node_h->{http_sufix} eq "//")) {
+        analysis_html_mod($node_h);
+    }
 }
 
 sub dump_mod
@@ -147,6 +210,12 @@ sub analysis_url
         if ($http_url =~ m/.*\.(.*)/) {
             if (length($1) <= 6) {
                 $http_sufix = $1;
+            }
+        } else {
+            if ($http_url eq "/") {
+                $http_sufix = "/";
+            } elsif (substr($http_url, -1, 1) eq "/") {
+                $http_sufix = "//";
             }
         }
     }
@@ -342,7 +411,7 @@ show_hash(\%cache_http_status_h, "CACHE_STATUS");
 show_hash(\%nocache_http_status_h, "NOCACHE_STATUS");
 show_hash(\%nocache_http_header_h, "NOCACHE_HEADER");
 show_hash(\%nocache_http_sufix_h, "NOCACHE_SUFIX");
-
+show_hash(\%html_http_header_h, "HTML_HEADER");
 
 if (exists($options{T})) {
     printf "\n\n### %s ###\n\n", timestr(timediff(new Benchmark, $startime));
