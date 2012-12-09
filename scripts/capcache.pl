@@ -71,28 +71,28 @@ sub analysis_html_mod
 
     if (($node_h->{http_etag} ne "-") &&
         ($node_h->{http_etag} ne "")) {
-        $hflag = 1;
+        $hflag |= 1;
         $html_http_header_h{http_etag} += 1;
         $html_http_header_h{http_etag_FLOW} += $node_h->{http_len};
     }
     
     if (($node_h->{http_lastmodify} ne "-") &&
         ($node_h->{http_lastmodify} ne "")) {
-        $hflag = 1;
+        $hflag |= 2;
         $html_http_header_h{http_lastmodify} += 1;
         $html_http_header_h{http_lastmodify_FLOW} += $node_h->{http_len};
     }
     
     if (($node_h->{cache_control} ne "-") &&
         ($node_h->{cache_control} ne "")) {
-        $hflag = 1;
+        $hflag |= 4;
         $html_http_header_h{cache_control} += 1;
         $html_http_header_h{cache_control_FLOW} += $node_h->{http_len};
     }
     
     if (($node_h->{cache_expired} ne "-") &&
         ($node_h->{cache_expired} ne "")) {
-        $hflag = 1;
+        $hflag |= 8;
         $html_http_header_h{cache_expired} += 1;
         $html_http_header_h{cache_expired_FLOW} += $node_h->{http_len};
     }
@@ -103,10 +103,14 @@ sub analysis_html_mod
     #
     # 统计
     # 1. 可以缓存的html流量
+    #   存在etag
+    #   expired时间在未来
+    #   cache_control max-age大于0
     # 2. 首页可以缓存的流量
     # 3. 超时时间统计
     #
-    if ($hflag == 1) {
+    #
+    if ($hflag & 1) {
         printf("URL: $node_h->{http_url} || $node_h->{http_etag} || $node_h->{http_lastmodify} || $node_h->{cache_control} || $node_h->{cache_expired}\n");
     }
 }
@@ -310,6 +314,7 @@ sub unzip_tmpfile
 sub parse_log
 {
     my ($filepath, $func, $reg, $domain) = @_;
+    my $errcnt = 0;
 
     my $tmpfile = unzip_tmpfile($filepath);
     if (!defined($tmpfile)) {
@@ -319,15 +324,21 @@ sub parse_log
 
     open(FILEHANDLE, $tmpfile) or do_exit("Can not open file $tmpfile!");
 
-    while (<FILEHANDLE>) {
+    LOOP: while (<FILEHANDLE>) {
         my @line = ($_ =~ m/$reg/);
         if ($#line > 0) {
             ## analysis ########
             &{$func}(\@line, $domain, $_);
         } else {
+            $errcnt += 1;
             if (exists($options{D})) {
                 printf("ERR: line regex: $_\n");
             }
+        }
+
+        if ($errcnt > 100) {
+            printf("   ERR: $filepath format error!\n");
+            last LOOP;
         }
     }
 
