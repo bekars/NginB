@@ -151,7 +151,6 @@ sub analysis_html_mod
     #   expired时间在未来
     #   cache_control max-age大于0
     # 2. 首页可以缓存的流量
-    # 3. 超时时间统计
     #
 
     if ($hflag & 4)
@@ -178,11 +177,13 @@ sub analysis_html_mod
 
     if ($cflag) {
         if ($debuglog) {
-            printf(DUMPFILE "URL: $node_h->{time} || $node_h->{http_url} || $node_h->{http_etag} || $node_h->{http_lastmodify} || $node_h->{cache_control} || $node_h->{cache_expired}\n");
+            $node_h->{http_url} =~ tr/%/#/;
+            printf(DUMPFILE "URL: $node_h->{time} || $node_h->{http_url} || $node_h->{http_etag} || $node_h->{cache_control} || $node_h->{cache_expired}\n");
         }
     } else {
         if ($debuglog) {
-            printf(DUMPFILE "NOCACHE: $node_h->{time} || $node_h->{http_url} || $node_h->{http_etag} || $node_h->{http_lastmodify} || $node_h->{cache_control} || $node_h->{cache_expired}\n");
+            $node_h->{http_url} =~ tr/%/#/;
+            printf(DUMPFILE "NOCACHE: $node_h->{time} || $node_h->{http_url} || $node_h->{http_etag} || $node_h->{cache_control} || $node_h->{cache_expired}\n");
         }
     } 
 }
@@ -250,6 +251,20 @@ sub nocache_analysis_mod
         ($node_h->{http_sufix} eq "//")) {
         analysis_html_mod($node_h);
     }
+}
+
+#
+# 超时时间统计
+#
+my %expired_h = ();
+
+sub expired_analysis_mod
+{
+    my $node_h = shift;
+    if (!defined($node_h)) {
+        return;
+    }
+
 }
 
 sub dump_mod
@@ -351,6 +366,7 @@ sub analysis
     }
     nocache_analysis_mod(\%node_h);
     cache_analysis_mod(\%node_h);
+#expired_analysis_mod(\%node_h);
 }
 
 sub unzip_tmpfile
