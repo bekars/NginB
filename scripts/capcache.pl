@@ -146,13 +146,13 @@ sub analysis_html_mod
     #
     # 统计
     # 1. 可以缓存的html流量
-    #   no-cache/no-store/private不能缓存
-    #   存在etag
-    #   expired时间在未来
-    #   cache_control max-age大于0
     # 2. 首页可以缓存的流量
     #
-
+    # 判断逻辑
+    #   如果存在cache_control头，判断no-cache/no-store/private标记不能缓存, max-age大于0可以缓存；
+    #   如果没有cache_control头而有expired头，expired时间在log时间之后可以缓存；
+    #   如果cache_control和expired头都没有，而有etag则可以缓存；
+    #
     if ($hflag & 4)
     {
         if (is_valid_cache_control($node_h->{cache_control})) {
