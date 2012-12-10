@@ -4,12 +4,15 @@ use strict;
 use Benchmark;
 use Getopt::Std;
 use Data::Dumper;
+use Date::Parse;
 #use Time::Interval;
 
 my %options = ();
 my $startime = new Benchmark;
 
 my $home_dir = "/usr/local/apache2/logs/";
+my $debug = 0;
+my $debuglog = 0;
 
 sub show_hash
 {
@@ -60,6 +63,45 @@ sub cache_analysis_mod
 #
 my %html_http_header_h = ();
 
+my $ccontrol_nocache_reg = qr/.*(no-cache|no-store|private).*$/;
+my $ccontrol_maxage_reg = qr/.*max-age=(.*?)(|,\s.*|\s.*)$/;
+sub is_valid_cache_control
+{
+    my $ccontrol = shift;
+    if (!defined($ccontrol)) {
+        return 0;
+    }
+
+    if ($ccontrol =~ m/$ccontrol_nocache_reg/) {
+        return 0;
+    }
+ 
+    my @age = ($ccontrol =~ m/$ccontrol_maxage_reg/);
+    if (($#age > 0) && ($age[0] > 0)) {
+        return 1;
+    }
+
+    return 0;
+}
+    
+sub is_valid_expired
+{
+    my ($expired, $logtime) = @_;
+    
+    if (length($expired) < 20) {
+        return 0;
+    }
+
+    $expired = str2time($expired);
+    $logtime = str2time($logtime);
+
+    if ($expired > $logtime) {
+        return 1;
+    }
+
+    return 0;
+}
+
 sub analysis_html_mod
 {
     my $node_h = shift;
@@ -68,6 +110,7 @@ sub analysis_html_mod
     }
 
     my $hflag = 0;
+    my $cflag = 0;
 
     if (($node_h->{http_etag} ne "-") &&
         ($node_h->{http_etag} ne "")) {
@@ -103,16 +146,45 @@ sub analysis_html_mod
     #
     # 统计
     # 1. 可以缓存的html流量
+    #   no-cache/no-store/private不能缓存
     #   存在etag
     #   expired时间在未来
     #   cache_control max-age大于0
     # 2. 首页可以缓存的流量
     # 3. 超时时间统计
     #
-    #
-    if ($hflag & 1) {
-        printf("URL: $node_h->{http_url} || $node_h->{http_etag} || $node_h->{http_lastmodify} || $node_h->{cache_control} || $node_h->{cache_expired}\n");
+
+    if ($hflag & 4)
+    {
+        if (is_valid_cache_control($node_h->{cache_control})) {
+            $cflag = 1;
+        }
+    } elsif ($hflag & 8) {
+        if (is_valid_expired($node_h->{cache_expired}, $node_h->{time})) {
+            $cflag = 1;
+        }
+    } elsif ($hflag & 1) {
+        $cflag = 1;
     }
+
+    if ($cflag) {
+        $html_http_header_h{CACHE} += 1;
+        $html_http_header_h{CACHE_FLOW} += $node_h->{http_len};
+        if ($node_h->{http_url} eq "/") {
+            $html_http_header_h{CACHE_MAINPAGE} += 1;
+            $html_http_header_h{CACHE_MAINPAGE_FLOW} += $node_h->{http_len};
+        }
+    }
+
+    if ($cflag) {
+        if ($debuglog) {
+            printf(DUMPFILE "URL: $node_h->{time} || $node_h->{http_url} || $node_h->{http_etag} || $node_h->{http_lastmodify} || $node_h->{cache_control} || $node_h->{cache_expired}\n");
+        }
+    } else {
+        if ($debuglog) {
+            printf(DUMPFILE "NOCACHE: $node_h->{time} || $node_h->{http_url} || $node_h->{http_etag} || $node_h->{http_lastmodify} || $node_h->{cache_control} || $node_h->{cache_expired}\n");
+        }
+    } 
 }
 
 #
@@ -274,7 +346,7 @@ sub analysis
         http_lastmodify => $log_data_a->[8],
     );
     
-    if (exists($options{D})) {
+    if ($debug) {
         dump_mod(\%node_h);
     }
     nocache_analysis_mod(\%node_h);
@@ -331,7 +403,7 @@ sub parse_log
             &{$func}(\@line, $domain, $_);
         } else {
             $errcnt += 1;
-            if (exists($options{D})) {
+            if ($debug) {
                 printf("ERR: line regex: $_\n");
             }
         }
@@ -386,15 +458,26 @@ sub usage
           "    -d <dir>         logs directory\n" .
           "    -f <logfile>     analysis log file\n" .
           "    -T               benchmark\n" .
-          "    -D               debug mode\n" .
+          "    -D               debug mode on\n" .
+          "    -L               debug log mode on\n" .
           "    -h               for help\n");
     exit();
 }
 
 
-getopts('t:d:f:hTD', \%options);
+getopts('t:d:f:hTDL', \%options);
 if (exists($options{h})) {
     usage();
+}
+
+open(DUMPFILE, ">dump.log");
+
+if (exists($options{D})) {
+    $debug = 1;
+}
+
+if (exists($options{L})) {
+    $debuglog = 1;
 }
 
 if (exists($options{f})) {
@@ -427,6 +510,8 @@ show_hash(\%html_http_header_h, "HTML_HEADER");
 if (exists($options{T})) {
     printf "\n\n### %s ###\n\n", timestr(timediff(new Benchmark, $startime));
 }
+
+close(DUMPFILE);
 
 __END__
 
