@@ -20,10 +20,10 @@ sub show_hash
     my $key;
 
     if (!defined($name)) {
-        $name = "%HASH";
+        $name = "HASH";
     }
 
-    printf("%$name = {\n");
+    printf("$name = {\n");
     foreach $key (sort keys %$hash) {
         printf("       '$key' => $hash->{$key},\n");
     }
@@ -256,7 +256,44 @@ sub nocache_analysis_mod
 #
 # 超时时间统计
 #
+# 统计所有资源expired和cache-control: max-age中的超时时间，分为
+# <1h, 1-2h, 2-3h, 3-4h, 4-5h, 5-6h, 6-7h, 7-8h, >8h
+# 几个区间统计流量和次数。
+#
 my %expired_h = ();
+
+sub get_expired_interval
+{
+    my ($expired, $logtime) = @_;
+    
+    if (length($expired) < 20) {
+        return 0;
+    }
+
+    $expired = str2time($expired);
+    $logtime = str2time($logtime);
+
+    if ($expired > $logtime) {
+        return ($expired - $logtime);
+    }
+
+    return 0;
+}
+
+sub get_maxage_interval
+{
+    my $ccontrol = shift;
+    if (!defined($ccontrol)) {
+        return 0;
+    }
+
+    my @age = ($ccontrol =~ m/$ccontrol_maxage_reg/);
+    if (($#age > 0) && ($age[0] > 0)) {
+        return $age[0];
+    }
+
+    return 0;
+}
 
 sub expired_analysis_mod
 {
@@ -265,6 +302,29 @@ sub expired_analysis_mod
         return;
     }
 
+    my $interval = -1;
+
+    if ((($node_h->{cache_control} eq "-") || 
+        ($node_h->{cache_control} eq "")) &&
+        (($node_h->{cache_expired} eq "-") || 
+        ($node_h->{cache_expired} eq "")))
+    {
+        return;
+    }
+
+    if (($node_h->{cache_expired} ne "-") &&
+        ($node_h->{cache_expired} ne "")) {
+        $interval = get_expired_interval($node_h->{cache_expired}, $node_h->{time});
+    } elsif (($node_h->{cache_control} ne "-") &&
+        ($node_h->{cache_control} ne "")) {
+        $interval = get_maxage_interval($node_h->{cache_control});
+    }
+
+    if ($interval > 0) {
+        $interval = int($interval / 3600);
+        $expired_h{$interval . "h"} += 1;
+        $expired_h{$interval . "h_FLOW"} += $node_h->{http_len};
+    }
 }
 
 sub dump_mod
@@ -364,9 +424,10 @@ sub analysis
     if ($debug) {
         dump_mod(\%node_h);
     }
+
     nocache_analysis_mod(\%node_h);
     cache_analysis_mod(\%node_h);
-#expired_analysis_mod(\%node_h);
+    expired_analysis_mod(\%node_h);
 }
 
 sub unzip_tmpfile
@@ -522,6 +583,7 @@ show_hash(\%nocache_http_status_h, "NOCACHE_STATUS");
 show_hash(\%nocache_http_header_h, "NOCACHE_HEADER");
 show_hash(\%nocache_http_sufix_h, "NOCACHE_SUFIX");
 show_hash(\%html_http_header_h, "HTML_HEADER");
+show_hash(\%expired_h, "EXPIRED_TTL");
 
 if (exists($options{T})) {
     printf "\n\n### %s ###\n\n", timestr(timediff(new Benchmark, $startime));
