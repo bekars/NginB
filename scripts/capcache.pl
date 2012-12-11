@@ -178,12 +178,12 @@ sub analysis_html_mod
     if ($cflag) {
         if ($debuglog) {
             $node_h->{http_url} =~ tr/%/#/;
-            printf(DUMPFILE "URL: $node_h->{time} || $node_h->{http_url} || $node_h->{http_etag} || $node_h->{cache_control} || $node_h->{cache_expired}\n");
+            printf(DUMPFILE "CACHEURL: $node_h->{domain}/$node_h->{http_url} || $node_h->{time} || $node_h->{http_etag} || $node_h->{cache_control} || $node_h->{cache_expired}\n");
         }
     } else {
         if ($debuglog) {
             $node_h->{http_url} =~ tr/%/#/;
-            printf(DUMPFILE "NOCACHE: $node_h->{time} || $node_h->{http_url} || $node_h->{http_etag} || $node_h->{cache_control} || $node_h->{cache_expired}\n");
+            printf(DUMPFILE "NOCACHE: $node_h->{domain}/$node_h->{http_url} || $node_h->{time} || $node_h->{http_etag} || $node_h->{cache_control} || $node_h->{cache_expired}\n");
         }
     } 
 }
