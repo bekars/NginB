@@ -193,7 +193,7 @@ sub analysis_html_mod
 #
 my %nocache_http_status_h = ();
 my %nocache_http_header_h = ();
-my %nocache_http_sufix_h = ();
+my %nocache_http_suffix_h = ();
 
 sub nocache_analysis_mod
 {
@@ -236,19 +236,19 @@ sub nocache_analysis_mod
         $nocache_http_header_h{cache_expired_FLOW} += $node_h->{http_len};
     }
     
-    if (($node_h->{http_sufix} ne "-") &&
-        ($node_h->{http_sufix} ne "")) {
-        $nocache_http_sufix_h{"." . "$node_h->{http_sufix}"} += 1;
-        $nocache_http_sufix_h{".$node_h->{http_sufix}" . "_FLOW"} += $node_h->{http_len};
+    if (($node_h->{http_suffix} ne "-") &&
+        ($node_h->{http_suffix} ne "")) {
+        $nocache_http_suffix_h{".$node_h->{http_suffix}"} += 1;
+        $nocache_http_suffix_h{".$node_h->{http_suffix}" . "_FLOW"} += $node_h->{http_len};
     } else {
-        $nocache_http_sufix_h{".NOSUFIX"} += 1;
-        $nocache_http_sufix_h{".NOSUFIX_FLOW"} += $node_h->{http_len};
+        $nocache_http_suffix_h{".NOSUFFIX"} += 1;
+        $nocache_http_suffix_h{".NOSUFFIX_FLOW"} += $node_h->{http_len};
     }
 
-    if (($node_h->{http_sufix} eq "htm") ||
-        ($node_h->{http_sufix} eq "html") ||
-        ($node_h->{http_sufix} eq "/") ||
-        ($node_h->{http_sufix} eq "//")) {
+    if (($node_h->{http_suffix} eq "htm") ||
+        ($node_h->{http_suffix} eq "html") ||
+        ($node_h->{http_suffix} eq "/") ||
+        ($node_h->{http_suffix} eq "//")) {
         analysis_html_mod($node_h);
     }
 }
@@ -463,6 +463,13 @@ sub expired_analysis_mod
                 last;
             }
         }
+ 
+        if (($node_h->{http_suffix} ne "-") && ($node_h->{http_suffix} ne "")) {
+            $expired_h{".$node_h->{http_suffix}"} += 1;
+            $expired_h{".$node_h->{http_suffix}" . "_FLOW"} += $node_h->{http_len};
+        }
+        $expired_h{TOTAL} += 1;
+        $expired_h{TOTAL_FLOW} += $node_h->{http_len};
     }
 }
 
@@ -492,7 +499,7 @@ sub analysis_url
     my $http_line = shift;
     my $http_method = "";
     my $http_uri = "";
-    my $http_sufix = "";
+    my $http_suffix = "";
     my $http_url = "";
     my $http_arg = "";
     my @ret_a;
@@ -514,23 +521,23 @@ sub analysis_url
     if (length($http_url)) {
         if ($http_url =~ m/.*\.(.*)/) {
             if (length($1) <= 6) {
-                $http_sufix = $1;
+                $http_suffix = $1;
             }
         } else {
             if ($http_url eq "/") {
-                $http_sufix = "/";
+                $http_suffix = "/";
             } elsif (substr($http_url, -1, 1) eq "/") {
-                $http_sufix = "//";
+                $http_suffix = "//";
             }
         }
     }
 
-    $http_sufix =~ tr/A-Z/a-z/;
+    $http_suffix =~ tr/A-Z/a-z/;
 
     push(@ret_a, $http_method);
     push(@ret_a, $http_url);
     push(@ret_a, $http_arg);
-    push(@ret_a, $http_sufix);
+    push(@ret_a, $http_suffix);
     return @ret_a;
 }
 
@@ -556,7 +563,7 @@ sub analysis
     #print(join "|", @$log_data_a);
     #print("\n\n");
 
-    my ($http_method, $http_url, $http_arg, $http_sufix) = analysis_url($log_data_a->[1]);
+    my ($http_method, $http_url, $http_arg, $http_suffix) = analysis_url($log_data_a->[1]);
  
     my %node_h = (
         domain          => $domain,
@@ -565,7 +572,7 @@ sub analysis
         http_method     => $http_method,
         http_url        => $http_url,
         http_arg        => $http_arg,
-        http_sufix      => $http_sufix,
+        http_suffix      => $http_suffix,
         http_status     => $log_data_a->[2],
         http_len        => $log_data_a->[3],
         cache_status    => $log_data_a->[4],
@@ -650,22 +657,22 @@ sub parse_log
 
 sub walk_dir
 {
-    my ($dir, $sufix, $cbfunc) = @_;
+    my ($dir, $suffix, $cbfunc) = @_;
     if (!defined($dir)) {
         return;
     }
 
     my $cnt = 0;
     
-    if (!defined($sufix)) {
-        $sufix = ".*";
+    if (!defined($suffix)) {
+        $suffix = ".*";
     }
 
     opendir(DIRHANDLE, $dir) or do_exit("Can not walk dir $dir !");
 
     my @file_a = readdir(DIRHANDLE);
     for my $i (0..$#file_a) {
-        if ($file_a[$i] =~ m/access_(.*?)_80\.$sufix(|\.gz)$/i) {
+        if ($file_a[$i] =~ m/access_(.*?)_80\.$suffix(|\.gz)$/i) {
             $cnt += 1;
             printf("Analysis $cnt $1 Log File: $file_a[$i] ...\n\n");
             ## parse_log ########
@@ -735,7 +742,7 @@ show_hash(\%cache_http_hit_h, "CACHE_HIT");
 show_hash(\%cache_http_status_h, "CACHE_STATUS");
 show_hash(\%nocache_http_status_h, "NOCACHE_STATUS");
 show_hash(\%nocache_http_header_h, "NOCACHE_HEADER");
-show_hash(\%nocache_http_sufix_h, "NOCACHE_SUFIX");
+show_hash(\%nocache_http_suffix_h, "NOCACHE_SUFFIX");
 show_hash(\%html_http_header_h, "HTML_HEADER");
 show_hash(\%expired_h, "EXPIRED_TTL");
 
