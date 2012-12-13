@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 
 use strict;
 use Benchmark;
@@ -35,6 +35,41 @@ sub show_hash
 #
 my %cache_http_hit_h = ();
 my %cache_http_status_h = ();
+my %cache_expired_h = ();
+
+# statistic no set TTL flow in cache resource
+sub cache_expired_analysis
+{
+    my $node_h = shift;
+    if (!defined($node_h)) {
+        return;
+    }
+
+    my $interval = -1;
+
+    if ((($node_h->{cache_control} eq "-") || 
+        ($node_h->{cache_control} eq "")) &&
+        (($node_h->{cache_expired} eq "-") || 
+        ($node_h->{cache_expired} eq "")))
+    {
+        $cache_expired_h{TOTAL} += 1;
+        $cache_expired_h{TOTAL_FLOW} += $node_h->{http_len};
+    }
+
+    if (($node_h->{cache_control} ne "-") &&
+        ($node_h->{cache_control} ne "")) {
+        $interval = get_maxage_interval($node_h->{cache_control});
+    }
+    elsif (($node_h->{cache_expired} ne "-") &&
+        ($node_h->{cache_expired} ne "")) {
+        $interval = get_expired_interval($node_h->{cache_expired}, $node_h->{time});
+    }
+
+    if ($interval <= 0) {
+        $cache_expired_h{TOTAL} += 1;
+        $cache_expired_h{TOTAL_FLOW} += $node_h->{http_len};
+    }
+}
 
 sub cache_analysis_mod
 {
@@ -56,6 +91,8 @@ sub cache_analysis_mod
     $cache_http_status_h{TOTAL} += 1;
     $cache_http_status_h{"$node_h->{http_status}" . "_FLOW"} += $node_h->{http_len};
     $cache_http_status_h{TOTAL_FLOW} += $node_h->{http_len};
+
+    cache_expired_analysis($node_h);
 }
 
 #
@@ -256,9 +293,8 @@ sub nocache_analysis_mod
 #
 # 超时时间统计
 #
-# 统计所有资源expired和cache-control: max-age中的超时时间，分为
-# <1h, 1-2h, 2-3h, 3-4h, 4-5h, 5-6h, 6-7h, 7-8h, >8h
-# 几个区间统计流量和次数。
+# 统计所有资源expired和cache-control: max-age中的超时时间，
+# 分为@ttl_a几个区间统计流量和次数。
 #
 my %expired_h = ();
 
@@ -267,7 +303,7 @@ sub get_expired_interval
     my ($expired, $logtime) = @_;
     
     if (length($expired) < 20) {
-        return 0;
+        return -1;
     }
 
     $expired = str2time($expired);
@@ -445,12 +481,13 @@ sub expired_analysis_mod
         return;
     }
 
-    if (($node_h->{cache_expired} ne "-") &&
-        ($node_h->{cache_expired} ne "")) {
-        $interval = get_expired_interval($node_h->{cache_expired}, $node_h->{time});
-    } elsif (($node_h->{cache_control} ne "-") &&
+    if (($node_h->{cache_control} ne "-") &&
         ($node_h->{cache_control} ne "")) {
         $interval = get_maxage_interval($node_h->{cache_control});
+    }
+    elsif (($node_h->{cache_expired} ne "-") &&
+        ($node_h->{cache_expired} ne "")) {
+        $interval = get_expired_interval($node_h->{cache_expired}, $node_h->{time});
     }
 
     if ($interval > 0) {
@@ -740,6 +777,7 @@ if (exists($options{f})) {
 
 show_hash(\%cache_http_hit_h, "CACHE_HIT");
 show_hash(\%cache_http_status_h, "CACHE_STATUS");
+show_hash(\%cache_expired_h, "CACHE_TTL");
 show_hash(\%nocache_http_status_h, "NOCACHE_STATUS");
 show_hash(\%nocache_http_header_h, "NOCACHE_HEADER");
 show_hash(\%nocache_http_suffix_h, "NOCACHE_SUFFIX");
