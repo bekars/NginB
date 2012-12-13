@@ -70,6 +70,7 @@ http {
     server {
         listen 80;
         server_name localhost;
+        more_set_headers 'Server: BLW';
         access_log /usr/local/nginx/logs/access.default.log default;
         location /status {
             stub_status on;
@@ -78,8 +79,14 @@ http {
             deny all;
         }
 
-        root  /usr/local/lighttpd/htm;
+        root  /usr/local/nginx/html/;
         index index.html;
+        
+        location ~* /index.html {
+            more_set_headers 'Cache-Control: max-age=3600';
+#more_set_headers -t 'text/plain text/css text/html' 'Content-Type: text/foo';
+        }
+
         location /open_url_cost.cgi {
 #allow 127.0.0.1;
 #deny all;
