@@ -18,6 +18,7 @@ sub show_hash
 {
     my ($hash, $name) = @_;
     my $key;
+    my $key_tmp;
 
     if (!defined($name)) {
         $name = "HASH";
@@ -25,8 +26,9 @@ sub show_hash
 
     printf("$name = {\n");
     foreach $key (sort keys %$hash) {
-        $hash->{$key} =~ tr/%/#/;
-        printf("       '$key' => $hash->{$key},\n");
+        $key_tmp = $key;
+        $key_tmp =~ tr/%/#/;
+        printf("       '$key_tmp' => $hash->{$key},\n");
     }
     printf("};\n");
 }
