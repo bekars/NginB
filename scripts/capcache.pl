@@ -101,7 +101,7 @@ sub cache_analysis_mod
 my %html_http_header_h = ();
 
 my $ccontrol_nocache_reg = qr/.*(no-cache|no-store|private).*$/;
-my $ccontrol_maxage_reg = qr/.*max-age=(.*?)(|,\s.*|\s.*)$/;
+my $ccontrol_maxage_reg = qr/.*max-age=(.*?)(|,.*|\s.*)$/;
 sub is_valid_cache_control
 {
     my $ccontrol = shift;
