@@ -22,7 +22,7 @@ server {
         proxy_pass     http://www.bekars.us;
         proxy_redirect off;
 
-        location ~* \.(gif|jpg|jpeg|png|bmp|swf|js|css|html)$ {
+        location ~* \.(gif|jpg|jpeg|png|bmp|swf|js|css|html)$|^/$ {
             proxy_pass     http://www.bekars.us;
             proxy_redirect off;
 
