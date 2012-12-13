@@ -25,6 +25,7 @@ sub show_hash
 
     printf("$name = {\n");
     foreach $key (sort keys %$hash) {
+        $hash->{$key} =~ tr/%/#/;
         printf("       '$key' => $hash->{$key},\n");
     }
     printf("};\n");
@@ -45,7 +46,7 @@ sub cache_expired_analysis
         return;
     }
 
-    my $interval = -1;
+    my $interval = 1;
 
     if ((($node_h->{cache_control} eq "-") || 
         ($node_h->{cache_control} eq "")) &&
@@ -54,6 +55,7 @@ sub cache_expired_analysis
     {
         $cache_expired_h{TOTAL} += 1;
         $cache_expired_h{TOTAL_FLOW} += $node_h->{http_len};
+        return;
     }
 
     if (($node_h->{cache_control} ne "-") &&
