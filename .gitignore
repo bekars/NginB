@@ -1,2 +1,4 @@
 *.log
 *.bak
+nginx-1.2.4/Makefile
+nginx-1.2.4/objs/
