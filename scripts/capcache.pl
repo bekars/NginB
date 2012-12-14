@@ -190,9 +190,10 @@ sub analysis_html_mod
     # 2. 首页可以缓存的流量
     #
     # 判断逻辑
-    #   如果存在cache_control头，判断no-cache/no-store/private标记不能缓存, max-age大于0可以缓存；
-    #   如果没有cache_control头而有expired头，expired时间在log时间之后可以缓存；
-    #   如果cache_control和expired头都没有，而有etag则可以缓存；
+    #   存在Set-Cookie头不能缓存；
+    #   如果存在Cache-Control头，存在no-cache/no-store/private标记不能缓存, max-age大于0可以缓存；
+    #   如果没有Cache-Control头而有Expirs头，Expirs时间有效且在未来可以缓存；
+    #   如果Cache-Control和Expirs头都没有，而有ETag或者Last-Modified则可以缓存 ???；
     #
     if ($hflag & 4)
     {

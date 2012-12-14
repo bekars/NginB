@@ -1,5 +1,5 @@
 *.log
 *.bak
-*.rst
+*.result
 nginx-1.2.4/Makefile
 nginx-1.2.4/objs/
