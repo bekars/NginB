@@ -77,6 +77,15 @@
 ./http/ngx_http_special_response.c
 ./modules/mod_capcache/ngx_capcache_module.h
 ./modules/mod_capcache/ngx_capcache_module.c
+./modules/mod_headers_more/src/ngx_http_headers_more_filter_module.h
+./modules/mod_headers_more/src/ngx_http_headers_more_util.h
+./modules/mod_headers_more/src/ngx_http_headers_more_headers_out.h
+./modules/mod_headers_more/src/ngx_http_headers_more_headers_in.h
+./modules/mod_headers_more/src/ddebug.h
+./modules/mod_headers_more/src/ngx_http_headers_more_headers_in.c
+./modules/mod_headers_more/src/ngx_http_headers_more_headers_out.c
+./modules/mod_headers_more/src/ngx_http_headers_more_filter_module.c
+./modules/mod_headers_more/src/ngx_http_headers_more_util.c
 ./modules/mod_strip/ngx_http_strip_filter_module.c
 ./modules/mod_minify/ngx_http_minify_filter_module_css.c
 ./modules/mod_minify/ngx_http_minify_filter_module.h
