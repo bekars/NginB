@@ -22,10 +22,16 @@ server {
         proxy_pass     http://www.bekars.us;
         proxy_redirect off;
 
-        location ~* \.(gif|jpg|jpeg|png|bmp|swf|js|css|html)$|^/$ {
+        location ~* \.(htm|html)$|^/$ {
+            more_set_headers 'Cache-Control: no-cache, max-age=3600';
+            proxy_pass http://www.bekars.us;
+            proxy_redirect off;
+            proxy_cache www.bekars.us;
+        }
+
+        location ~* \.(gif|jpg|jpeg|png|bmp|swf|js|css)$ {
             proxy_pass     http://www.bekars.us;
             proxy_redirect off;
-
             proxy_cache www.bekars.us;
         }
     }

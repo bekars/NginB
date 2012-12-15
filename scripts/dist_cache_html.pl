@@ -27,6 +27,7 @@ while (<CACHE_HTML>)
 close(CACHE_HTML);
 
 my $site;
+my $path;
 my $siteip;
 my $curl_cmd;
 my $curl_rst;
@@ -34,21 +35,22 @@ open(CACHE_HTML_DIST, ">cache_html_dist.result") or die("open cache_html_dist.re
 foreach my $key (sort {mysort($a, $b)} keys %html_h) {
     $siteip = "*";
     printf(CACHE_HTML_DIST "######################################\n");
-    if ($key =~ m/(.*?)\/.*/) {
+    if ($key =~ m/(.*?)\/(.*)$/) {
         $site = $1;
+        $path = $2;
         $siteip = getSiteIP($site);
     }
     printf(CACHE_HTML_DIST "$key => $html_h{$key} ($siteip)\n");
     printf("$key => $html_h{$key} ($siteip)\n");
     
     if (length($siteip) > 6) {
-        $curl_cmd = "curl --connect-timeout 10 -m 20 -I http://$siteip -H 'Host: $site' 2>&1";
+        $curl_cmd = "curl --connect-timeout 10 -m 20 -I http://$siteip/$path -H 'Host: $site' 2>&1";
         $curl_rst = `$curl_cmd`;
         $curl_rst =~ tr/%/#/;
         printf(CACHE_HTML_DIST "$curl_cmd\n$curl_rst\n");
     }
 
-    if ($html_h{$key} < 10000) {
+    if ($html_h{$key} < 100) {
         last;
     }
 }

@@ -190,7 +190,7 @@ sub analysis_html_mod
     # 2. 首页可以缓存的流量
     #
     # 判断逻辑
-    #   存在Set-Cookie头不能缓存；
+    #   存在Set-Cookie头不能缓存(log中目前没有记录)；
     #   如果存在Cache-Control头，存在no-cache/no-store/private标记不能缓存, max-age大于0可以缓存；
     #   如果没有Cache-Control头而有Expirs头，Expirs时间有效且在未来可以缓存；
     #   如果Cache-Control和Expirs头都没有，而有ETag或者Last-Modified则可以缓存 ???；
@@ -204,7 +204,7 @@ sub analysis_html_mod
         if (is_valid_expired($node_h->{cache_expired}, $node_h->{time})) {
             $cflag = 1;
         }
-    } elsif ($hflag & 1) {
+    } elsif (($hflag & 1) || ($hflag & 2)) {
         $cflag = 1;
     }
 
@@ -214,6 +214,11 @@ sub analysis_html_mod
         if ($node_h->{http_url} eq "/") {
             $html_http_header_h{CACHE_MAINPAGE} += 1;
             $html_http_header_h{CACHE_MAINPAGE_FLOW} += $node_h->{http_len};
+        }
+    
+        if ($hflag & 2) {
+            $html_http_header_h{CACHE_LM} += 1;
+            $html_http_header_h{CACHE_LM_FLOW} += $node_h->{http_len};
         }
     }
 
@@ -517,7 +522,7 @@ sub expired_analysis_mod
 
 sub dump_log_expired
 {
-    open(EXPIRED_FILE, ">ttl.log");
+    open(EXPIRED_FILE, ">ttl.result");
 
     for my $index (0..$#ttl_a) {
         if (exists($expired_h{$ttl_a[$index]{name}})) {
@@ -750,7 +755,7 @@ if (exists($options{h})) {
     usage();
 }
 
-open(DUMPFILE, ">dump.log");
+open(DUMPFILE, ">dump.result");
 
 if (exists($options{D})) {
     $debug = 1;
