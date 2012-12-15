@@ -23,7 +23,14 @@ server {
         proxy_redirect off;
 
         location ~* \.(htm|html)$|^/$ {
-            more_set_headers 'Cache-Control: no-cache, max-age=3600';
+#set $bc "no-cache, max-age:3600";
+#if ($upstream_http_cache_control ~ "max-age:") {
+#                set $bc $upstream_http_cache_control;
+#            }
+#            set $bcb 123;
+            set $bcb $upstream_http_cache_control;
+#more_set_headers 'Cache-Control: $bcb, ccc';
+more_set_headers 'Cache-Control:$upstream_http_cache_control, abc';
             proxy_pass http://www.bekars.us;
             proxy_redirect off;
             proxy_cache www.bekars.us;

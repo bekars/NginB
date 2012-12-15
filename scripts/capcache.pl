@@ -787,7 +787,7 @@ if (exists($options{f})) {
 
 show_hash(\%cache_http_hit_h, "CACHE_HIT");
 show_hash(\%cache_http_status_h, "CACHE_STATUS");
-show_hash(\%cache_expired_h, "CACHE_TTL");
+show_hash(\%cache_expired_h, "CACHE_NOTTL");
 show_hash(\%nocache_http_status_h, "NOCACHE_STATUS");
 show_hash(\%nocache_http_header_h, "NOCACHE_HEADER");
 show_hash(\%nocache_http_suffix_h, "NOCACHE_SUFFIX");
