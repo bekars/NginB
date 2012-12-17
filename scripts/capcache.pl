@@ -5,6 +5,8 @@ use Benchmark;
 use Getopt::Std;
 use Data::Dumper;
 use Date::Parse;
+use Speedy::TTL qw(&ttl_analysis_mod &ttl_dump_log &get_maxage_interval &get_expired_interval %expires_h);
+use	Speedy::CacheControl qw(&cachecontrol_analysis_mod);
 #use Time::Interval;
 
 my %options = ();
@@ -300,241 +302,6 @@ sub nocache_analysis_mod
     }
 }
 
-#
-# 超时时间统计
-#
-# 统计所有资源expired和cache-control: max-age中的超时时间，
-# 分为@ttl_a几个区间统计流量和次数。
-#
-my %expired_h = ();
-
-sub get_expired_interval
-{
-    my ($expired, $logtime) = @_;
-    
-    if (length($expired) < 20) {
-        return -1;
-    }
-
-    $expired = str2time($expired);
-    $logtime = str2time($logtime);
-
-    if ($expired > $logtime) {
-        return ($expired - $logtime);
-    }
-
-    return 0;
-}
-
-sub get_maxage_interval
-{
-    my $ccontrol = shift;
-    if (!defined($ccontrol)) {
-        return 0;
-    }
-
-    my @age = ($ccontrol =~ m/$ccontrol_maxage_reg/);
-    if (($#age > 0) && ($age[0] > 0)) {
-        return $age[0];
-    }
-
-    return 0;
-}
-
-my @ttl_a = (
-    {
-        name => "1h",
-        min => 0,
-        max => 3600,
-    },
-    {
-        name => "2h",
-        min => 3600,
-        max => 7200,
-    },
-    {
-        name => "3h",
-        min => 7200,
-        max => 10800,
-    },
-    {
-        name => "4h",
-        min => 10800,
-        max => 14400,
-    },
-    {
-        name => "5h",
-        min => 14400,
-        max => 18000,
-    },
-    {
-        name => "6h",
-        min => 18000,
-        max => 21600,
-    },
-    {
-        name => "8h",
-        min => 21600,
-        max => 28800,
-    },
-    {
-        name => "12h",
-        min => 28800,
-        max => 43200,
-    },
-    {
-        name => "16h",
-        min => 43200,
-        max => 57600,
-    },
-    {
-        name => "20h",
-        min => 57600,
-        max => 72000,
-    },
-    {
-        name => "1d",
-        min => 72000,
-        max => 86400,
-    },
-    {
-        name => "2d",
-        min => 86400,
-        max => 172800,
-    },
-    {
-        name => "3d",
-        min => 172800,
-        max => 259200,
-    },
-    {
-        name => "4d",
-        min => 259200,
-        max => 345600,
-    },
-    {
-        name => "5d",
-        min => 345600,
-        max => 432000,
-    },
-    {
-        name => "6d",
-        min => 432000,
-        max => 518400,
-    },
-    {
-        name => "8d",
-        min => 518400,
-        max => 691200,
-    },
-    {
-        name => "16d",
-        min => 691200,
-        max => 1382400,
-    },
-    {
-        name => "24d",
-        min => 1382400,
-        max => 2073600,
-    },
-    {
-        name => "1m",
-        min => 2073600,
-        max => 2592000,
-    },
-    {
-        name => "2m",
-        min => 2592000,
-        max => 5184000,
-    },
-    {
-        name => "3m",
-        min => 5184000,
-        max => 7776000,
-    },
-    {
-        name => "6m",
-        min => 7776000,
-        max => 15552000,
-    },
-    {
-        name => "9m",
-        min => 15552000,
-        max => 23328000,
-    },
-    {
-        name => "1y",
-        min => 23328000,
-        max => 31104000,
-    },
-    {
-        name => ">1y",
-        min => 31104000,
-        max => 9999999999,
-    },
-);
-
-sub expired_analysis_mod
-{
-    my $node_h = shift;
-    if (!defined($node_h)) {
-        return;
-    }
-
-    my $interval = -1;
-
-    if ((($node_h->{cache_control} eq "-") || 
-        ($node_h->{cache_control} eq "")) &&
-        (($node_h->{cache_expired} eq "-") || 
-        ($node_h->{cache_expired} eq "")))
-    {
-        return;
-    }
-
-    if (($node_h->{cache_control} ne "-") &&
-        ($node_h->{cache_control} ne "")) {
-        $interval = get_maxage_interval($node_h->{cache_control});
-    }
-    elsif (($node_h->{cache_expired} ne "-") &&
-        ($node_h->{cache_expired} ne "")) {
-        $interval = get_expired_interval($node_h->{cache_expired}, $node_h->{time});
-    }
-
-    if ($interval > 0) {
-        for my $index (0..$#ttl_a) {
-            if (($interval > $ttl_a[$index]{min}) && 
-                ($interval <= $ttl_a[$index]{max}))
-            {
-                $expired_h{$ttl_a[$index]{name}} += 1;
-                $expired_h{$ttl_a[$index]{name} . "_FLOW"} += $node_h->{http_len};
-                last;
-            }
-        }
- 
-        if (($node_h->{http_suffix} ne "-") && ($node_h->{http_suffix} ne "")) {
-            $expired_h{".$node_h->{http_suffix}"} += 1;
-            $expired_h{".$node_h->{http_suffix}" . "_FLOW"} += $node_h->{http_len};
-        }
-        $expired_h{TOTAL} += 1;
-        $expired_h{TOTAL_FLOW} += $node_h->{http_len};
-    }
-}
-
-sub dump_log_expired
-{
-    open(EXPIRED_FILE, ">ttl.result");
-
-    for my $index (0..$#ttl_a) {
-        if (exists($expired_h{$ttl_a[$index]{name}})) {
-            printf(EXPIRED_FILE "$ttl_a[$index]{name}\t" . 
-                "$expired_h{$ttl_a[$index]{name} . '_FLOW'}\t" .
-                "$expired_h{$ttl_a[$index]{name}}\n");
-        }
-    }
-
-    close(EXPIRED_FILE);
-}
-
 sub dump_mod
 {
     my $node_h = shift;
@@ -635,7 +402,8 @@ sub analysis
 
     nocache_analysis_mod(\%node_h);
     cache_analysis_mod(\%node_h);
-    expired_analysis_mod(\%node_h);
+    ttl_analysis_mod(\%node_h);
+    cachecontrol_analysis_mod(\%node_h);
 }
 
 sub unzip_tmpfile
@@ -792,9 +560,9 @@ show_hash(\%nocache_http_status_h, "NOCACHE_STATUS");
 show_hash(\%nocache_http_header_h, "NOCACHE_HEADER");
 show_hash(\%nocache_http_suffix_h, "NOCACHE_SUFFIX");
 show_hash(\%html_http_header_h, "HTML_HEADER");
-show_hash(\%expired_h, "EXPIRED_TTL");
+show_hash(\%expires_h, "EXPIRED_TTL");
 
-dump_log_expired();
+ttl_dump_log();
 
 if (exists($options{T})) {
     printf "\n\n### %s ###\n\n", timestr(timediff(new Benchmark, $startime));
