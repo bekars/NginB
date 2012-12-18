@@ -6,7 +6,7 @@ use Getopt::Std;
 use Data::Dumper;
 use Date::Parse;
 use Speedy::TTL qw(&ttl_analysis_mod &ttl_dump_log &get_maxage_interval &get_expired_interval %expires_h);
-use	Speedy::CacheControl qw(&cachecontrol_analysis_mod);
+use Speedy::CacheControl qw(&cachecontrol_analysis_mod);
 #use Time::Interval;
 
 my %options = ();
