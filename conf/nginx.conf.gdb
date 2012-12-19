@@ -4,7 +4,7 @@ worker_processes  1;
 
 #error_log  logs/error.log;
 #error_log  logs/error.log  notice;
-error_log  logs/error.log  info;
+error_log  logs/error.log  debug;
 
 #error_log  logs/error.log  [debug_alloc | debug_mutex | debug_event | debug_http | debug_imap];
 
