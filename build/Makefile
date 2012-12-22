@@ -10,9 +10,10 @@ config:
 	cd ${NGX_PATH}; \
 	./configure --with-debug \
 		--with-http_stub_status_module \
+		--add-module=${NGX_MOD_MORE_PATH}/echo-nginx-module \
 		--add-module=${NGX_MOD_MORE_PATH}/ngx_devel_kit \
 		--add-module=${NGX_MOD_MORE_PATH}/lua-nginx-module \
-		--add-module=${NGX_MOD_PATH}/mod_headers_more \
+		--add-module=${NGX_MOD_MORE_PATH}/headers-more-nginx-module \
 		--add-module=${NGX_MOD_PATH}/mod_breakpoint \
 		--add-module=${NGX_MOD_PATH}/mod_minify \
 		--add-module=${NGX_MOD_PATH}/mod_capcache

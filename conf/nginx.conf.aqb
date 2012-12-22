@@ -45,14 +45,14 @@ http {
     sendfile        on;
 #   tcp_nopush     on;
 
-#keepalive_timeout  0;
+    #keepalive_timeout  0;
     keepalive_timeout  120;
     proxy_buffer_size 64k;
     proxy_max_temp_file_size 5m;
     proxy_buffers 8 128k;
     proxy_read_timeout 120;
 
-#gzip  on;
+    #gzip  on;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-Host $host; 
@@ -85,12 +85,28 @@ http {
         
         location ~* /index.html {
             more_set_headers 'Cache-Control: max-age=3600';
-#more_set_headers -t 'text/plain text/css text/html' 'Content-Type: text/foo';
+            #more_set_headers -t 'text/plain text/css text/html' 'Content-Type: text/foo';
+        }
+
+        # lua test
+        location /lua {
+            set $test "hello, world.";
+            content_by_lua '
+                ngx.header.content_type = "text/plain";
+                ngx.say(ngx.var.test);
+            ';
+        }
+        
+        # echo test
+        location /echo {
+            echo hello;
+            echo world;
+            echo_before_body bekars;
         }
 
         location /open_url_cost.cgi {
-#allow 127.0.0.1;
-#deny all;
+            #allow 127.0.0.1;
+            #deny all;
             fastcgi_pass  127.0.0.1:8888;
             fastcgi_param  QUERY_STRING       $query_string;
             fastcgi_param  REQUEST_METHOD     $request_method;
