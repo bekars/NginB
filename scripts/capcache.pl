@@ -7,6 +7,7 @@ use Data::Dumper;
 use Date::Parse;
 use Speedy::TTL qw(&ttl_analysis_mod &ttl_dump_log &get_maxage_interval &get_expired_interval %expires_h);
 use Speedy::CacheControl qw(&cachecontrol_analysis_mod);
+use Speedy::CacheHit qw(&cachehit_analysis_mod &cachehit_analysis_init &cachehit_result %cache_hit_h);
 #use Time::Interval;
 
 my %options = ();
@@ -35,70 +36,13 @@ sub show_hash
     printf("};\n");
 }
 
-#
-# analysis cache resource
-#
-my %cache_http_hit_h = ();
-my %cache_http_status_h = ();
-my %cache_expired_h = ();
-
-# statistic no set TTL flow in cache resource
-sub cache_expired_analysis
+sub mod_init
 {
-    my $node_h = shift;
-    if (!defined($node_h)) {
-        return;
-    }
+    my %mod_h = (
+        date => $options{t},
+    );
 
-    my $interval = 1;
-
-    if ((($node_h->{cache_control} eq "-") || 
-        ($node_h->{cache_control} eq "")) &&
-        (($node_h->{cache_expired} eq "-") || 
-        ($node_h->{cache_expired} eq "")))
-    {
-        $cache_expired_h{TOTAL} += 1;
-        $cache_expired_h{TOTAL_FLOW} += $node_h->{http_len};
-        return;
-    }
-
-    if (($node_h->{cache_control} ne "-") &&
-        ($node_h->{cache_control} ne "")) {
-        $interval = get_maxage_interval($node_h->{cache_control});
-    }
-    elsif (($node_h->{cache_expired} ne "-") &&
-        ($node_h->{cache_expired} ne "")) {
-        $interval = get_expired_interval($node_h->{cache_expired}, $node_h->{time});
-    }
-
-    if ($interval <= 0) {
-        $cache_expired_h{TOTAL} += 1;
-        $cache_expired_h{TOTAL_FLOW} += $node_h->{http_len};
-    }
-}
-
-sub cache_analysis_mod
-{
-    my $node_h = shift;
-    if (!defined($node_h)) {
-        return;
-    }
-
-    if (($node_h->{cache_status} eq "-") ||
-        ($node_h->{cache_status} eq "")) {
-        return;
-    }
-    
-    $cache_http_hit_h{$node_h->{cache_status}} += 1;
-    $cache_http_hit_h{TOTAL} += 1;
-    $cache_http_hit_h{"$node_h->{cache_status}" . "_FLOW"} += $node_h->{http_len};
-    $cache_http_hit_h{TOTAL_FLOW} += $node_h->{http_len};
-    $cache_http_status_h{$node_h->{http_status}} += 1;
-    $cache_http_status_h{TOTAL} += 1;
-    $cache_http_status_h{"$node_h->{http_status}" . "_FLOW"} += $node_h->{http_len};
-    $cache_http_status_h{TOTAL_FLOW} += $node_h->{http_len};
-
-    cache_expired_analysis($node_h);
+    cachehit_analysis_init(\%mod_h);
 }
 
 #
@@ -401,7 +345,7 @@ sub analysis
     }
 
     nocache_analysis_mod(\%node_h);
-    cache_analysis_mod(\%node_h);
+    cachehit_analysis_mod(\%node_h);
     ttl_analysis_mod(\%node_h);
     cachecontrol_analysis_mod(\%node_h);
 }
@@ -550,18 +494,21 @@ if (exists($options{f})) {
         $home_dir = $options{d};
     }
 
+    mod_init();
     walk_dir($home_dir, "log.$options{t}", \&parse_log);
 }
 
-show_hash(\%cache_http_hit_h, "CACHE_HIT");
-show_hash(\%cache_http_status_h, "CACHE_STATUS");
-show_hash(\%cache_expired_h, "CACHE_NOTTL");
+show_hash(\%cache_hit_h, "CACHE_HIT");
+#show_hash(\%cache_http_status_h, "CACHE_STATUS");
+#show_hash(\%cache_expired_h, "CACHE_NOTTL");
 show_hash(\%nocache_http_status_h, "NOCACHE_STATUS");
 show_hash(\%nocache_http_header_h, "NOCACHE_HEADER");
 show_hash(\%nocache_http_suffix_h, "NOCACHE_SUFFIX");
 show_hash(\%html_http_header_h, "HTML_HEADER");
 show_hash(\%expires_h, "EXPIRED_TTL");
 
+
+cachehit_result();
 ttl_dump_log();
 
 if (exists($options{T})) {

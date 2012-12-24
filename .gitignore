@@ -1,5 +1,6 @@
 *.log
 *.bak
 *.result
+*.swp
 nginx-1.2.4/Makefile
 nginx-1.2.4/objs/
