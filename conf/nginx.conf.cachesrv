@@ -15,6 +15,11 @@ server {
         proxy_pass $scheme://$http_host$request_uri;
         proxy_redirect off;
 
+        location ~* ^/mmsns/ {
+            proxy_pass $scheme://$http_host$request_uri;
+            proxy_cache cachesrv;
+        }
+
         location ~* .(gif|jpg|jpeg|png|bmp|swf|js|css)$ {
             proxy_pass $scheme://$http_host$request_uri;
             proxy_cache cachesrv;
