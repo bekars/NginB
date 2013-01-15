@@ -1,0 +1,29 @@
+proxy_cache_path /data/nginx/cache_proxy levels=1 keys_zone=cache_proxy:100m inactive=4h max_size=1000m;
+
+server {
+	listen 8181 default backlog=8192;
+        access_log "/usr/local/apache2/logs/access_cacheproxy_8181.log" main;
+ 
+        #resolver 114.114.114.114;
+        #resolver 202.106.0.20;
+        resolver 8.8.8.8;
+        resolver_timeout 5s;
+
+        proxy_cache_valid 200 302 4h;
+
+        location / {
+               	proxy_pass $scheme://$http_host$request_uri;
+ 	        proxy_redirect off;
+
+ 	        location ~* ^/mmsns/ {
+ 	       		proxy_pass $scheme://$http_host$request_uri;
+ 	          	proxy_cache cache_proxy;
+		}
+		
+ 	        location ~* .(gif|jpg|jpeg|png|bmp|swf|js|css)$ {
+ 	       		proxy_pass $scheme://$http_host$request_uri;
+ 	          	proxy_cache cache_proxy;
+		}
+	}
+}
+
