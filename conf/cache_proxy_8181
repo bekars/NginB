@@ -27,3 +27,19 @@ server {
 	}
 }
 
+server {
+	server_name sina.com www.sina.com;
+	listen 8181 default backlog=8192;
+        access_log "/usr/local/apache2/logs/access_cacheproxy_8181.log" main;
+        
+	resolver 8.8.8.8;
+        resolver_timeout 5s;
+
+        proxy_cache_valid 200 302 4h;
+
+        location / {
+ 		proxy_pass $scheme://$http_host$request_uri;
+ 		proxy_cache cache_proxy;
+	}
+}
+
