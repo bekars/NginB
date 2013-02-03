@@ -3,13 +3,16 @@ NGX_PATH          = $(TOP_PATH)/nginx-1.2.4
 NGX_MOD_PATH      = $(TOP_PATH)/modules
 NGX_MOD_MORE_PATH = /home/baiyu/GitHub
 
-NGX_MOD_CONFIG    = --add-module=${NGX_MOD_MORE_PATH}/echo-nginx-module \
-		--add-module=${NGX_MOD_MORE_PATH}/ngx_devel_kit \
-		--add-module=${NGX_MOD_MORE_PATH}/lua-nginx-module \
-		--add-module=${NGX_MOD_MORE_PATH}/headers-more-nginx-module \
-		--add-module=${NGX_MOD_PATH}/mod_breakpoint \
-		--add-module=${NGX_MOD_PATH}/mod_minify \
-		--add-module=${NGX_MOD_PATH}/mod_capcache
+NGX_MOD_CONFIG    = --with-http_ssl_module \
+	--with-http_sub_module \
+	--add-module=${NGX_MOD_MORE_PATH}/echo-nginx-module \
+	--add-module=${NGX_MOD_MORE_PATH}/ngx_devel_kit \
+	--add-module=${NGX_MOD_MORE_PATH}/lua-nginx-module \
+	--add-module=${NGX_MOD_MORE_PATH}/headers-more-nginx-module \
+	--add-module=${NGX_MOD_PATH}/mod_breakpoint \
+	--add-module=${NGX_MOD_PATH}/mod_minify \
+	--add-module=${NGX_MOD_PATH}/mod_capcache \
+	--add-module=${NGX_MOD_PATH}/mod_aqb
 		
 #NGX_MOD_CONFIG   += --add-module=${NGX_MOD_MORE_PATH}/ngx_pagespeed
 
