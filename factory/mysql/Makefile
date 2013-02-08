@@ -36,6 +36,7 @@ install:
 pre:
 	mkdir -p /usr/local/mysql
 	mkdir -p /var/mysqldata
+	chmod 777 /var/mysqldata
 	groupadd mysql
 	useradd -g mysql mysql
 
