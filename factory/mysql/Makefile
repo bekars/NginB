@@ -27,6 +27,12 @@ config:
 build:
 	cd $(DIR) && make
 
+install:
+	cd $(DIR) && make install
+	cd $(DIR) && cp support-files/mysql.server /etc/init.d/mysql
+	chmod +x /etc/init.d/mysql
+	cd $(DIR) && chmod +x scripts/mysql_install_db && scripts/mysql_install_db --user=mysql --basedir=/usr/local/mysql/ --datadir=/var/mysqldata/
+
 pre:
 	mkdir -p /usr/local/mysql
 	mkdir -p /var/mysqldata
