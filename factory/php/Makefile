@@ -31,3 +31,7 @@ pre:
 unzip:
 	tar jxvf $(TAR)
 
+wget:
+	wget -O $(TAR) $(URL)
+
+
