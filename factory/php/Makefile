@@ -13,7 +13,8 @@ config:
 	cd $(DIR) && ./configure --prefix=/usr/local/php \
 		--with-mysql=/usr/local/mysql \
 		--with-mysqli=/usr/local/mysql/bin/mysql_config \
-		--with-mysql-sock=/var/run/mysqld/mysqld.sock
+		--with-mysql-sock=/var/run/mysqld/mysqld.sock \
+		--disable-fileinfo
 
 build:
 	cd $(DIR) && make
