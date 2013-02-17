@@ -9,6 +9,7 @@ NGX_MOD_CONFIG    = --with-http_ssl_module \
 	--add-module=${NGX_MOD_MORE_PATH}/ngx_devel_kit \
 	--add-module=${NGX_MOD_MORE_PATH}/lua-nginx-module \
 	--add-module=${NGX_MOD_MORE_PATH}/headers-more-nginx-module \
+	--add-module=${NGX_MOD_MORE_PATH}/ngx_pagespeed \
 	--add-module=${NGX_MOD_PATH}/mod_breakpoint \
 	--add-module=${NGX_MOD_PATH}/mod_minify \
 	--add-module=${NGX_MOD_PATH}/mod_capcache \
