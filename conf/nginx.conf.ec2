@@ -50,6 +50,18 @@ http {
         #charset koi8-r;
 
         #access_log  logs/host.access.log  main;
+
+        pagespeed on;
+        pagespeed RewriteLevel CoreFilters;
+
+        # needs to exist and be writable by nginx
+        pagespeed FileCachePath /data/nginx/cache/ngx_pagespeed_cache;
+
+        # This is a temporary workaround that ensures requests for pagespeed
+        # optimized resources go to the pagespeed handler.
+        location ~ "\.pagespeed\.([a-z]\.)?[a-z]{2}\.[^.]{10}\.[^.]+" { }
+        location ~ "^/ngx_pagespeed_static/" { }
+        location ~ "^/ngx_pagespeed_beacon$" { }
         
         location ~ \.php$ {
             root  html/wordpress;

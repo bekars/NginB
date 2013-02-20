@@ -41,16 +41,16 @@ server {
 		internal;
 	}
 
-	sqlfilter               on;
-	sqlfilter_log_file      /usr/local/nginx/logs/www.baiyu.org.cn_80_sqlfilter.log;
-	sqlfilter_deny          on;
-	smartrule_deny          off;
+#   sqlfilter               on;
+#	sqlfilter_log_file      /usr/local/nginx/logs/www.baiyu.org.cn_80_sqlfilter.log;
+#	sqlfilter_deny          on;
+#	smartrule_deny          off;
 
 	location / {
 		proxy_pass     http://www.baiyu.org.cn;
 		proxy_redirect off;
 
-		include /etc/nginx/rule/file_www.baiyu.org.cn_80;
+#		include /etc/nginx/rule/file_www.baiyu.org.cn_80;
 
 		location ~* \.(gif|jpg|jpeg|png|bmp|swf|js|css|ico|mp3|txt|wma|zip|exe|bin|7z|pdf|cab|wmv|mdb|wav|flv|sisx|dat)$ {
 			proxy_pass     http://www.baiyu.org.cn;
