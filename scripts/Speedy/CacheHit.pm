@@ -23,7 +23,7 @@ $VERSION	= '1.0.0';
 our %cache_hit_h = ();
 my %cache_http_status_h = ();
 my %cache_expired_h = ();
-my $logfile = "cache_hit.%s.result";
+my $log_result = "%s/cachehit.result";
 
 sub cache_expired_analysis
 {
@@ -66,7 +66,7 @@ sub cachehit_analysis_init($)
         return;
     }
 
-    $logfile = sprintf($logfile, $mod_h->{date});
+    $log_result = sprintf($log_result, $mod_h->{date});
 }
 
 sub cachehit_analysis_mod($)
@@ -95,6 +95,10 @@ sub cachehit_analysis_mod($)
 
 sub cachehit_result
 {
+    if (!exists($cache_hit_h{HIT})) {
+        return 0;
+    }
+
     # HIT   MISS    EXPIRED     -   TOTAL   HIT_RATE    CACHE_RATE
     $cache_hit_h{HITRATE} = $cache_hit_h{HIT} * 100 / ($cache_hit_h{HIT} + $cache_hit_h{MISS} + $cache_hit_h{EXPIRED});
     $cache_hit_h{HITRATE_FLOW} = $cache_hit_h{HIT_FLOW} * 100 / ($cache_hit_h{HIT_FLOW} + $cache_hit_h{MISS_FLOW} + $cache_hit_h{EXPIRED_FLOW});
@@ -112,7 +116,7 @@ sub cachehit_result
                    $cache_hit_h{CACHERATE}, $cache_hit_h{CACHERATE_FLOW},
                );
 
-    open(CACHEHIT_FILE, ">$logfile") or return;
+    open(CACHEHIT_FILE, ">$log_result") or return;
     printf(CACHEHIT_FILE $line);
     close(CACHEHIT_FILE);
 }

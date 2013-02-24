@@ -11,36 +11,19 @@ use Benchmark;
 use Getopt::Std;
 use Data::Dumper;
 use Date::Parse;
-use Speedy::TTL qw(&ttl_analysis_mod &ttl_dump_log &get_maxage_interval &get_expired_interval %expires_h);
+use Speedy::TTL qw(&ttl_analysis_mod &ttl_analysis_init &ttl_result &get_maxage_interval &get_expired_interval %expires_h);
 use Speedy::CacheControl qw(&cachecontrol_analysis_mod);
 use Speedy::CacheHit qw(&cachehit_analysis_mod &cachehit_analysis_init &cachehit_result %cache_hit_h);
-#use Time::Interval;
+use Speedy::Utils qw(&showHash);
+use Speedy::Html qw(&html_analysis_mod &html_analysis_init %html_http_header_h);
 
 my %options = ();
 my $startime = new Benchmark;
 
-my $home_dir = "/usr/local/apache2/logs/";
+my $home_dir = "/var/BLOGS/logs/";
 my $debug = 0;
 my $debuglog = 0;
 
-sub show_hash
-{
-    my ($hash, $name) = @_;
-    my $key;
-    my $key_tmp;
-
-    if (!defined($name)) {
-        $name = "HASH";
-    }
-
-    printf("$name = {\n");
-    foreach $key (sort keys %$hash) {
-        $key_tmp = $key;
-        $key_tmp =~ tr/%/#/;
-        printf("       '$key_tmp' => $hash->{$key},\n");
-    }
-    printf("};\n");
-}
 
 sub mod_init
 {
@@ -48,144 +31,11 @@ sub mod_init
         date => $options{t},
     );
 
+    ttl_analysis_init(\%mod_h);
     cachehit_analysis_init(\%mod_h);
+    html_analysis_init(\%mod_h);
 }
 
-#
-# analysis html resource
-#
-my %html_http_header_h = ();
-
-my $ccontrol_nocache_reg = qr/.*(no-cache|no-store|private).*$/;
-my $ccontrol_maxage_reg = qr/.*max-age=(.*?)(|,.*|\s.*)$/;
-sub is_valid_cache_control
-{
-    my $ccontrol = shift;
-    if (!defined($ccontrol)) {
-        return 0;
-    }
-
-    if ($ccontrol =~ m/$ccontrol_nocache_reg/) {
-        return 0;
-    }
- 
-    my @age = ($ccontrol =~ m/$ccontrol_maxage_reg/);
-    if (($#age > 0) && ($age[0] > 0)) {
-        return 1;
-    }
-
-    return 0;
-}
-    
-sub is_valid_expired
-{
-    my ($expired, $logtime) = @_;
-    
-    if (length($expired) < 20) {
-        return 0;
-    }
-
-    $expired = str2time($expired);
-    $logtime = str2time($logtime);
-
-    if ($expired > $logtime) {
-        return 1;
-    }
-
-    return 0;
-}
-
-sub analysis_html_mod
-{
-    my $node_h = shift;
-    if (!defined($node_h)) {
-        return;
-    }
-
-    my $hflag = 0;
-    my $cflag = 0;
-
-    if (($node_h->{http_etag} ne "-") &&
-        ($node_h->{http_etag} ne "")) {
-        $hflag |= 1;
-        $html_http_header_h{http_etag} += 1;
-        $html_http_header_h{http_etag_FLOW} += $node_h->{http_len};
-    }
-    
-    if (($node_h->{http_lastmodify} ne "-") &&
-        ($node_h->{http_lastmodify} ne "")) {
-        $hflag |= 2;
-        $html_http_header_h{http_lastmodify} += 1;
-        $html_http_header_h{http_lastmodify_FLOW} += $node_h->{http_len};
-    }
-    
-    if (($node_h->{cache_control} ne "-") &&
-        ($node_h->{cache_control} ne "")) {
-        $hflag |= 4;
-        $html_http_header_h{cache_control} += 1;
-        $html_http_header_h{cache_control_FLOW} += $node_h->{http_len};
-    }
-    
-    if (($node_h->{cache_expired} ne "-") &&
-        ($node_h->{cache_expired} ne "")) {
-        $hflag |= 8;
-        $html_http_header_h{cache_expired} += 1;
-        $html_http_header_h{cache_expired_FLOW} += $node_h->{http_len};
-    }
-    
-    $html_http_header_h{TOTAL} += 1;
-    $html_http_header_h{TOTAL_FLOW} += $node_h->{http_len};
-
-    #
-    # 统计
-    # 1. 可以缓存的html流量
-    # 2. 首页可以缓存的流量
-    #
-    # 判断逻辑
-    #   存在Set-Cookie头不能缓存(log中目前没有记录)；
-    #   如果存在Cache-Control头，存在no-cache/no-store/private标记不能缓存, max-age大于0可以缓存；
-    #   如果没有Cache-Control头而有Expirs头，Expirs时间有效且在未来可以缓存；
-    #   如果Cache-Control和Expirs头都没有，而有ETag或者Last-Modified则可以缓存 ???；
-    #
-    if ($hflag & 4)
-    {
-        if (is_valid_cache_control($node_h->{cache_control})) {
-            $cflag = 1;
-        }
-    } elsif ($hflag & 8) {
-        if (is_valid_expired($node_h->{cache_expired}, $node_h->{time})) {
-            $cflag = 1;
-        }
-    } elsif (($hflag & 1) || ($hflag & 2)) {
-        $cflag = 1;
-    }
-
-    if ($cflag) {
-        $html_http_header_h{CACHE} += 1;
-        $html_http_header_h{CACHE_FLOW} += $node_h->{http_len};
-        if ($node_h->{http_url} eq "/") {
-            $html_http_header_h{CACHE_MAINPAGE} += 1;
-            $html_http_header_h{CACHE_MAINPAGE_FLOW} += $node_h->{http_len};
-        }
-    
-        if ($hflag & 2) {
-            $html_http_header_h{CACHE_LM} += 1;
-            $html_http_header_h{CACHE_LM_FLOW} += $node_h->{http_len};
-        }
-    }
-
-    if ($cflag) {
-        if ($debuglog) {
-            $node_h->{http_url} =~ tr/%/#/;
-            printf(DUMPFILE "CACHEURL: $node_h->{domain}$node_h->{http_url} || $node_h->{time} || $node_h->{http_etag} || $node_h->{cache_control} || $node_h->{cache_expired}\n");
-        }
-    } else {
-        if ($debuglog) {
-            $node_h->{http_url} =~ tr/%/#/;
-            printf(DUMPFILE "NOCACHE: $node_h->{domain}$node_h->{http_url} || $node_h->{time} || $node_h->{http_etag} || $node_h->{cache_control} || $node_h->{cache_expired}\n");
-        }
-    } 
-}
 
 #
 # analysis no-cache resource
@@ -244,12 +94,6 @@ sub nocache_analysis_mod
         $nocache_http_suffix_h{".NOSUFFIX_FLOW"} += $node_h->{http_len};
     }
 
-    if (($node_h->{http_suffix} eq "htm") ||
-        ($node_h->{http_suffix} eq "html") ||
-        ($node_h->{http_suffix} eq "/") ||
-        ($node_h->{http_suffix} eq "//")) {
-        analysis_html_mod($node_h);
-    }
 }
 
 sub dump_mod
@@ -320,6 +164,13 @@ sub analysis_url
 #                     1           2         3       4                                                           5         6           7           8           9
 my $log_reg = qr/.*?\[(?# TIME)(.*?)\]\s+\"(?# URI)(.*?)\"\s+(?# HTTP_STATUS)(.*?)\s+(?# HTTP_LEN)(.*?)\s+\"[^\"]*\"\s+\"[^\"]*\"\s+\"[^\"]*\"\s+\"[^\"]*\"\s+(?# CACHE_STATUS)(.*?)\s+\"(?# EXPIRED)(.*?)\"\s+\"(?# CACHE_CONTROL)(.*?)\"\s+\"(?# ETAG)(.*?)\"\s+\"(?# LAST_MODIFIED)(.*?)\"\s+.*/;
 
+use constant {TIME=>0, URL=>1, STATUS=>2, LENGTH=>3, CACHE_STATUS=>4, EXPIRED=>5, CACHE_CONTROL=>6, ETAG=>7, LAST_MODIFIED=>8};
+
+#
+# log_data_a : log reg word segment
+# domain     : domain name
+# log        : whle log line
+#
 sub analysis
 {
     my ($log_data_a, $domain, $log) = @_;
@@ -336,7 +187,7 @@ sub analysis
         http_method     => $http_method,
         http_url        => $http_url,
         http_arg        => $http_arg,
-        http_suffix      => $http_suffix,
+        http_suffix     => $http_suffix,
         http_status     => $log_data_a->[2],
         http_len        => $log_data_a->[3],
         cache_status    => $log_data_a->[4],
@@ -354,6 +205,7 @@ sub analysis
     cachehit_analysis_mod(\%node_h);
     ttl_analysis_mod(\%node_h);
     cachecontrol_analysis_mod(\%node_h);
+    html_analysis_mod(\%node_h);
 }
 
 sub unzip_tmpfile
@@ -386,6 +238,12 @@ sub unzip_tmpfile
     return "/tmp/$tmpfile";
 }
 
+#
+# filepath : log file path
+# func     : parse log line cb (analysis)
+# reg      : log line reg
+# domain   : log domain name
+#
 sub parse_log
 {
     my ($filepath, $func, $reg, $domain) = @_;
@@ -420,6 +278,11 @@ sub parse_log
     close(FILEHANDLE);
 }
 
+#
+# dir    : logs location
+# suffix : log file suffix
+# cbfunc : call back to parse log (parse_log)
+#
 sub walk_dir
 {
     my ($dir, $suffix, $cbfunc) = @_;
@@ -433,7 +296,7 @@ sub walk_dir
         $suffix = ".*";
     }
 
-    opendir(DIRHANDLE, $dir) or do_exit("Can not walk dir $dir !");
+    opendir(DIRHANDLE, $dir) or do_exit("Can not open dir $dir !");
 
     my @file_a = readdir(DIRHANDLE);
     for my $i (0..$#file_a) {
@@ -468,6 +331,11 @@ sub usage
 }
 
 
+##########################################
+# start main
+#
+##########################################
+
 getopts('t:d:f:hTDL', \%options);
 if (exists($options{h})) {
     usage();
@@ -500,22 +368,23 @@ if (exists($options{f})) {
         $home_dir = $options{d};
     }
 
+    mkdir($options{t}, 0755);# or do_exit("ERR: can not mkdir $options{t}!");
     mod_init();
     walk_dir($home_dir, "log.$options{t}", \&parse_log);
 }
 
-show_hash(\%cache_hit_h, "CACHE_HIT");
-#show_hash(\%cache_http_status_h, "CACHE_STATUS");
-#show_hash(\%cache_expired_h, "CACHE_NOTTL");
-show_hash(\%nocache_http_status_h, "NOCACHE_STATUS");
-show_hash(\%nocache_http_header_h, "NOCACHE_HEADER");
-show_hash(\%nocache_http_suffix_h, "NOCACHE_SUFFIX");
-show_hash(\%html_http_header_h, "HTML_HEADER");
-show_hash(\%expires_h, "EXPIRED_TTL");
+showHash(\%cache_hit_h, "CACHE_HIT");
+#showHash(\%cache_http_status_h, "CACHE_STATUS");
+#showHash(\%cache_expired_h, "CACHE_NOTTL");
+showHash(\%nocache_http_status_h, "NOCACHE_STATUS");
+showHash(\%nocache_http_header_h, "NOCACHE_HEADER");
+showHash(\%nocache_http_suffix_h, "NOCACHE_SUFFIX");
+showHash(\%html_http_header_h, "HTML_HEADER");
+showHash(\%expires_h, "EXPIRED_TTL");
 
 
 cachehit_result();
-ttl_dump_log();
+ttl_result();
 
 if (exists($options{T})) {
     printf "\n\n### %s ###\n\n", timestr(timediff(new Benchmark, $startime));

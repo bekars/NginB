@@ -67,21 +67,6 @@ sub is_valid_expired
     return 0;
 }
 
-sub htmll_result
-{
-    open(EXPIRED_FILE, ">$log_result");
-
-    for my $index (0..$#TTL_a) {
-        if (exists($expires_h{$TTL_a[$index]{name}})) {
-            printf(EXPIRED_FILE "$TTL_a[$index]{name}\t" . 
-                "$expires_h{$TTL_a[$index]{name} . '_FLOW'}\t" .
-                "$expires_h{$TTL_a[$index]{name}}\n");
-        }
-    }
-
-    close(EXPIRED_FILE);
-}
-
 sub html_analysis_init($)
 {
     my $mod_h = shift;
@@ -200,11 +185,10 @@ sub html_analysis_mod($)
         }
     }
 
-    open(RESULTFILE, ">$log_result");
+    open(RESULTFILE, ">>$log_result");
     $node_h->{http_url} =~ tr/%/#/;
-    if (!$nocache) {
-        $line_hdr = "CACHED";
-    } else {
+    my $line_hdr = "CACHED";
+    if ($nocache) {
         $line_hdr = "NOCACHED";
     } 
     printf(RESULTFILE "$line_hdr: $node_h->{domain}$node_h->{http_url} || $node_h->{time} || $node_h->{http_etag} || $node_h->{cache_control} || $node_h->{cache_expired}\n");

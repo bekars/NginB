@@ -1,10 +1,10 @@
 ###################################################
-## perl module for dealing with aqb
+## module include some aqb utils
 ###################################################
 
 
 ## Global Stuff ###################################
-package	Aqb;
+package	Speedy::Aqb;
 use		strict;
 use     DBI;
 require	Exporter;
