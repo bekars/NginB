@@ -32,12 +32,13 @@ sub showHash
         $name = "HASH";
     }
 
-    printf("$name = {\n");
+    printf("my %%$name = (\n");
     foreach $key (sort keys %$hash) {
         $key_tmp = $key;
         $key_tmp =~ tr/%/#/;
+        $key_tmp =~ tr/'/*/;
         printf("       '$key_tmp' => $hash->{$key},\n");
     }
-    printf("};\n");
+    printf(");\n");
 }
 
