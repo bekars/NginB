@@ -4,7 +4,7 @@
 
 
 ## Global Stuff ###################################
-package	Speedy::Aqb;
+package	Speedy::AQB;
 use		strict;
 use     DBI;
 require	Exporter;
@@ -12,7 +12,7 @@ require	Exporter;
 #class global vars ...
 use vars qw($VERSION @EXPORT @ISA);
 @ISA 		= qw(Exporter);
-@EXPORT		= qw(&getSiteIP);
+@EXPORT		= qw(&getSiteIP &getSchedule &getStr);
 $VERSION	= '1.0.0';
 
 my $dbh;
@@ -53,15 +53,16 @@ END
     $dbh->disconnect();
 }
 
-sub getSiteIP($)
+sub getSiteInfo($)
 {
-    my $ip;
-    my $site = shift;
-    if (!defined($site)) {
-        return;
+    my %site_h = ();
+    my $ip = "";
+    my $name = shift;
+    if (!defined($name)) {
+        return \%site_h;
     }
-
-    my $sql = "select ip from records where whole_name like '$site'";
+    
+    my $sql = "select ip from records where whole_name like '$name'";
     my $sth = $dbh->prepare($sql);
 
     $sth->execute() or die("SQL err: " . $sth->errstr);
@@ -71,7 +72,42 @@ sub getSiteIP($)
     }
     $sth->finish();  
 
-    return $ip;
+    $site_h{'ip'} = $ip;
+    return \%site_h;
 }
 
+sub getSiteIP($)
+{
+    my $name = shift;
+    if (!defined($name)) {
+        return "";
+    }
+
+    my $site = getSiteInfo($name);
+    if (exists($site->{'ip'})) {
+        return $site->{'ip'};
+    }
+    return "";
+}
+
+sub getSchedule($)
+{
+    my $schedule;
+    my $domain = shift;
+    if (!defined($domain)) {
+        return;
+    }
+
+    my $sql = "select sitedefault from domain where domain='$domain'";
+    my $sth = $dbh->prepare($sql);
+
+    $sth->execute() or die("SQL err: " . $sth->errstr);
+    my @recs = $sth->fetchrow_array;
+    if ($#recs >= 0) {
+        $schedule = $recs[0];
+    }
+    $sth->finish();  
+
+    return $schedule;
+}
 
