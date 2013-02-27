@@ -41,11 +41,11 @@ http {
 #    gzip_types text/plain application/xml application/x-javascript text/javascript text/css;
 
     resolver 202.106.0.20;
+    more_set_headers 'Server: BLW-ALY81';
 
     server {
         listen       80;
         server_name  localhost;
-        more_set_headers 'Server: BLW-EC2';
 
         #charset koi8-r;
 
