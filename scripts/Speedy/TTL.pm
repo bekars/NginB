@@ -17,10 +17,12 @@ require	Exporter;
 use vars qw($VERSION @EXPORT @EXPORT_OK @ISA);
 @ISA 		= qw(Exporter);
 @EXPORT		= qw(@TTL_a %expires_h);
-@EXPORT_OK	= qw(&ttl_analysis_mod &ttl_dump_log &get_maxage_interval &get_expired_interval);
+@EXPORT_OK	= qw(&ttl_analysis_mod &ttl_analysis_init &ttl_result &get_maxage_interval &get_expired_interval);
 $VERSION	= '1.0.0';
 
 ## statistic intervals ############################
+my $log_result = "%s/ttl.result";
+our %expires_h = ();
 our @TTL_a = (
     {
         name => "1h",
@@ -154,8 +156,6 @@ our @TTL_a = (
     },
 );
 
-our %expires_h = ();
-my $logfile = "ttl.result";
 
 sub get_expired_interval
 {
@@ -228,6 +228,7 @@ sub ttl_analysis_mod($)
             }
         }
  
+        # 统计设置了超时时间的各类资源的数据
         if (($node_h->{http_suffix} ne "-") && ($node_h->{http_suffix} ne "")) {
             $expires_h{".$node_h->{http_suffix}"} += 1;
             $expires_h{".$node_h->{http_suffix}" . "_FLOW"} += $node_h->{http_len};
@@ -237,9 +238,9 @@ sub ttl_analysis_mod($)
     }
 }
 
-sub ttl_dump_log
+sub ttl_result
 {
-    open(EXPIRED_FILE, ">$logfile");
+    open(EXPIRED_FILE, ">$log_result");
 
     for my $index (0..$#TTL_a) {
         if (exists($expires_h{$TTL_a[$index]{name}})) {
@@ -250,6 +251,16 @@ sub ttl_dump_log
     }
 
     close(EXPIRED_FILE);
+}
+
+sub ttl_analysis_init($)
+{
+    my $mod_h = shift;
+    if (!defined($mod_h)) {
+        return;
+    }
+
+    $log_result = sprintf($log_result, $mod_h->{date});
 }
 
 1;

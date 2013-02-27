@@ -6,7 +6,7 @@ use Benchmark;
 use Getopt::Std;
 use Data::Dumper;
 
-my $logdate = "20130210";
+my $logdate = "20130216";
 my $cnt = 0;
 my $lognum_file = "lognum_" . $logdate . ".result";
 my $speedsite_file = "speedsite_" . $logdate . ".result";
