@@ -136,7 +136,7 @@ http {
 
         location / {
             root   html/wordpress;
-            index  index.html;
+            index  index.php;
         }
     }
 
