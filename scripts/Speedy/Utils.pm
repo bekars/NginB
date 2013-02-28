@@ -37,8 +37,14 @@ sub showHash
         $key_tmp = $key;
         $key_tmp =~ tr/%/#/;
         $key_tmp =~ tr/'/*/;
-        printf("       '$key_tmp' => $hash->{$key},\n");
+        if ($hash->{$key}) {
+            printf("       '$key_tmp' => $hash->{$key},\n");
+        } else {
+            printf("       '$key_tmp' => NONE,\n");
+        }
     }
     printf(");\n");
 }
+
+1;
 
