@@ -16,6 +16,7 @@ use Speedy::CacheControl qw(&cachecontrol_analysis_mod);
 use Speedy::CacheHit qw(&cachehit_analysis_mod &cachehit_analysis_init &cachehit_result %cache_hit_h);
 use Speedy::Utils qw(&showHash);
 use Speedy::Html qw(&html_analysis_mod &html_analysis_init %html_http_header_h);
+use IO::Handle;
 
 my %options = ();
 my $startime = new Benchmark;
@@ -306,6 +307,7 @@ sub walk_dir
             ## parse_log ########
             &{$cbfunc}("$dir/$file_a[$i]", \&analysis, $log_reg, $1);
         }
+        $|++;
     }
     
     closedir(DIRHANDLE);
