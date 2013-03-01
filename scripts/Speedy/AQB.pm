@@ -57,12 +57,13 @@ END
 }
 
 use constant {
-    RECORD_ID       => 0, 
-    RECORD_IP       => 1,
-    RECORD_TYPE     => 2,
-    RECORD_DNS      => 3,
-    RECORD_DOMAINID => 4,
-    RECORD_REV      => 5,
+    RECORD_ID        => 0, 
+    RECORD_IP        => 1,
+    RECORD_TYPE      => 2,
+    RECORD_DNS       => 3,
+    RECORD_DOMAINID  => 4,
+    RECORD_REV       => 5,
+    RECORD_WHOLENAME => 6,
 };
 
 use constant {
@@ -79,7 +80,7 @@ sub getSiteInfo($)
         return \%site_h;
     }
     
-    my $sql = "select id,ip,type,dns,domain_id,rev from records where whole_name='$name'";
+    my $sql = "select id,ip,type,dns,domain_id,rev,whole_name from records where whole_name='$name'";
     my $sth = $dbh->prepare($sql);
     $sth->execute() or die("SQL err: " . $sth->errstr);
     my @recs = $sth->fetchrow_array;
@@ -90,6 +91,7 @@ sub getSiteInfo($)
         $site_h{'dns'} = $recs[RECORD_DNS];
         $site_h{'domainid'} = $recs[RECORD_DOMAINID];
         $site_h{'rev'} = $recs[RECORD_REV];
+        $site_h{'whole_name'} = $recs[RECORD_WHOLENAME];
     } else {
         printf("ERR: site ($name) no find in db!\n");
         $sth->finish();  
@@ -113,29 +115,46 @@ sub getSiteInfo($)
 }
 
 use constant {
-    DOMAIN_ID = 0,
+    DOMAIN_ID   => 0,
+    DOMAIN      => 1,
+    STATUS      => 2,
+    USER_ID     => 3,
+    NS          => 4,
+    CHECK_TIME  => 5,
+    SITEDEFAULT => 6,
+    TYPE        => 7,
+    DNS_SRV     => 8,
+    CHECKIN     => 9,
+};
 
 sub getDomainInfo($)
 {
     my %domain_h = ();
-    my $schedule = "";
     my $name = shift;
     if (!defined($name)) {
         return;
     }
 
-    my $sql = "select sitedefault from domain where domain='$name'";
+    my $sql = "select id,domain,status,user_id,ns,check_time,sitedefault,type,dnsserver,checkin from domain where domain='$name'";
     my $sth = $dbh->prepare($sql);
 
     $sth->execute() or die("SQL err: " . $sth->errstr);
     my @recs = $sth->fetchrow_array;
     if ($#recs >= 0) {
-        $schedule = $recs[0];
+        $domain_h{'domain_id'} = $recs[DOMAIN_ID];
+        $domain_h{'domain'} = $recs[DOMAIN];
+        $domain_h{'status'} = $recs[STATUS];
+        $domain_h{'user_id'} = $recs[USER_ID];
+        $domain_h{'ns'} = $recs[NS];
+        $domain_h{'check_time'} = $recs[CHECK_TIME];
+        $domain_h{'sitedefault'} = $recs[SITEDEFAULT];
+        $domain_h{'type'} = $recs[TYPE];
+        $domain_h{'dns_srv'} = $recs[DNS_SRV];
+        $domain_h{'checkin'} = $recs[CHECKIN];
     }
     $sth->finish();  
 
     # fill info
-    $domain_h{'schedule'} = $schedule;
     return \%domain_h;
 }
 

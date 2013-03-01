@@ -9,7 +9,7 @@ use Speedy::Http;
 use Speedy::Utils;
 use IO::Handle;
 
-my $logdate = "20130216";
+my $logdate = "20130227";
 my $cnt = 0;
 my $lognum_file = "lognum_" . $logdate . ".result";
 my $speedsite_file = "speedsite_" . $logdate . ".result";
