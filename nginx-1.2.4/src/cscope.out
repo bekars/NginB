@@ -1,4 +1,4 @@
-cscope 15 $HOME/GitHub/NginB/nginx-1.2.4/src -q 0000007992 0002720047
+cscope 15 $HOME/GitHub/NginB/nginx-1.2.4/src -q 0000008011 0002725803
 	@core/nginx.c
 
 8 
@@ -459703,6 +459703,1050 @@ NGX_OK
 	}
 }
 
+	@modules/mod_aqb/ngx_http_aqb_cp_filter_module.c
+
+1 
+	~<ngx_cÚfig.h
+>
+
+2 
+	~<ngx_cÜe.h
+>
+
+3 
+	~<ngx_h‰p.h
+>
+
+7 
+	sngx_h‰p_aqb_ý_cÚf
+
+
+9 
+ngx_æag_t
+ 
+	mý_’abË
+;
+
+10 
+ngx_¬¿y_t
+ *
+	m¶ugšs
+;
+
+11 } 
+	tngx_h‰p_aqb_ý_cÚf_t
+;
+
+17 
+	mok
+;
+
+18 } 
+	tngx_h‰p_aqb_ý_ùx_t
+;
+
+20 *
+ngx_h‰p_aqb_ý_lßd_¶ugš
+(
+ngx_cÚf_t
+ *
+cf
+, 
+ngx_commªd_t
+ *
+cmd
+, *
+cÚf
+);
+
+23 
+ngx_commªd_t
+ 
+	gngx_h‰p_aqb_ý_fž‹r_commªds
+[] = {
+
+25 
+ngx_¡ršg
+("coolplay"),
+
+26 
+NGX_HTTP_LOC_CONF
+|
+NGX_CONF_FLAG
+|
+NGX_CONF_TAKE1
+,
+
+27 
+ngx_cÚf_£t_æag_¦Ù
+,
+
+28 
+NGX_HTTP_LOC_CONF_OFFSET
+,
+
+29 
+off£tof
+(
+ngx_h‰p_aqb_ý_cÚf_t
+, 
+ý_’abË
+),
+
+30 
+NULL
+
+
+33 
+ngx_¡ršg
+("cp_plugin"),
+
+34 
+NGX_HTTP_LOC_CONF
+|
+NGX_CONF_1MORE
+,
+
+35 
+ngx_h‰p_aqb_ý_lßd_¶ugš
+,
+
+36 
+NGX_HTTP_LOC_CONF_OFFSET
+,
+
+38 
+NULL
+
+
+41 
+ngx_nuÎ_commªd
+
+
+45 *
+ngx_h‰p_aqb_ý_ü—‹_cÚf
+(
+ngx_cÚf_t
+ *
+cf
+);
+
+46 *
+ngx_h‰p_aqb_ý_m”ge_cÚf
+(
+ngx_cÚf_t
+ *
+cf
+, *
+·»Á
+, *
+chžd
+);
+
+47 
+ngx_št_t
+ 
+ngx_h‰p_aqb_ý_fž‹r_š™
+(
+ngx_cÚf_t
+ *
+cf
+);
+
+49 
+ngx_h‰p_moduË_t
+ 
+	gngx_h‰p_aqb_ý_fž‹r_moduË_ùx
+ = {
+
+50 
+NULL
+,
+
+51 
+ngx_h‰p_aqb_ý_fž‹r_š™
+,
+
+53 
+NULL
+,
+
+54 
+NULL
+,
+
+56 
+NULL
+,
+
+57 
+NULL
+,
+
+59 
+ngx_h‰p_aqb_ý_ü—‹_cÚf
+,
+
+60 
+ngx_h‰p_aqb_ý_m”ge_cÚf
+
+
+64 
+ngx_moduË_t
+ 
+	gngx_h‰p_aqb_ý_fž‹r_moduË
+ = {
+
+65 
+NGX_MODULE_V1
+,
+
+66 &
+ngx_h‰p_aqb_ý_fž‹r_moduË_ùx
+,
+
+67 
+ngx_h‰p_aqb_ý_fž‹r_commªds
+,
+
+68 
+NGX_HTTP_MODULE
+,
+
+69 
+NULL
+,
+
+70 
+NULL
+,
+
+71 
+NULL
+,
+
+72 
+NULL
+,
+
+73 
+NULL
+,
+
+74 
+NULL
+,
+
+75 
+NULL
+,
+
+76 
+NGX_MODULE_V1_PADDING
+
+
+79 
+ngx_h‰p_ouut_h—d”_fž‹r_±
+ 
+	gngx_h‰p_Ãxt_h—d”_fž‹r
+;
+
+80 
+ngx_h‰p_ouut_body_fž‹r_±
+ 
+	gngx_h‰p_Ãxt_body_fž‹r
+;
+
+82 
+ngx_št_t
+ 
+ngx_h‰p_aqb_ý_h—d”_fž‹r
+(
+ngx_h‰p_»que¡_t
+ *
+r
+);
+
+83 
+ngx_št_t
+ 
+ngx_h‰p_aqb_ý_body_fž‹r
+(
+ngx_h‰p_»que¡_t
+ *
+r
+, 
+ngx_chaš_t
+ *
+š
+);
+
+85 
+	#PN
+ 10
+
+	)
+
+88 
+	$ngx_h‰p_aqb_ý_lßd_¶ugš
+(
+ngx_cÚf_t
+ *
+cf
+, 
+ngx_commªd_t
+ *
+cmd
+, *
+cÚf
+)
+
+91 
+ngx_h‰p_aqb_ý_cÚf_t
+ *
+ýcf
+ = 
+cÚf
+;
+
+97 ià(
+ýcf
+->
+¶ugšs
+ =ð
+NULL
+) {
+
+98 
+ýcf
+->
+¶ugšs
+ = 
+	`ngx_¬¿y_ü—‹
+(
+cf
+->
+‹mp_poÞ
+, 
+PN
+, (
+ngx_¡r_t
+));
+
+100 ià(
+ýcf
+->
+¶ugšs
+ =ð
+NULL
+) {
+
+101  
+NGX_CONF_ERROR
+;
+
+121  
+NGX_CONF_OK
+;
+
+122 
+	}
+}
+
+125 
+ngx_št_t
+
+
+126 
+	$ngx_h‰p_aqb_ý_h—d”_fž‹r
+(
+ngx_h‰p_»que¡_t
+ *
+r
+)
+
+128 
+ngx_h‰p_aqb_ý_ùx_t
+ *
+ùx
+;
+
+129 
+ngx_h‰p_aqb_ý_cÚf_t
+ *
+ýcf
+;
+
+131 
+ýcf
+ = 
+	`ngx_h‰p_g‘_moduË_loc_cÚf
+(
+r
+, 
+ngx_h‰p_aqb_ý_fž‹r_moduË
+);
+
+134 
+ýcf
+->
+ý_’abË
+ == 0
+
+135 || 
+ýcf
+->
+¶ugšs
+ =ð
+NULL
+
+
+136 || 
+ýcf
+->
+¶ugšs
+->
+ÃÉs
+ == 0
+
+137 || 
+r
+->
+h—d”_Úly
+
+
+138 || (
+r
+->
+m‘hod
+ & 
+NGX_HTTP_HEAD
+)
+
+139 || 
+r
+ !ðr->
+maš
+
+
+140 || 
+r
+->
+h—d”s_out
+.
+¡©us
+ =ð
+NGX_HTTP_NO_CONTENT
+
+
+142  
+	`ngx_h‰p_Ãxt_h—d”_fž‹r
+(
+r
+);
+
+145 
+ùx
+ = 
+	`ngx_pÿÎoc
+(
+r
+->
+poÞ
+, (
+ngx_h‰p_aqb_ý_ùx_t
+));
+
+146 ià(
+ùx
+ =ð
+NULL
+) {
+
+147  
+NGX_ERROR
+;
+
+151 
+	`ngx_h‰p_þ—r_cÚ‹Á_Ëngth
+(
+r
+);
+
+152 
+	`ngx_h‰p_þ—r_acû±_¿nges
+(
+r
+);
+
+154 
+	`ngx_h‰p_£t_ùx
+(
+r
+, 
+ùx
+, 
+ngx_h‰p_aqb_ý_fž‹r_moduË
+);
+
+155 
+ùx
+->
+ok
+ = 0;
+
+157 ià(
+ýcf
+)
+
+159 
+ýcf
+ = 
+NULL
+;
+
+160 
+ýcf
+ = 
+	`ngx_h‰p_g‘_moduË_loc_cÚf
+(
+r
+, 
+ngx_h‰p_aqb_ý_fž‹r_moduË
+);
+
+161 ià(
+ýcf
+)
+
+163 
+	`ngx_log_debug0
+(
+NGX_LOG_DEBUG_HTTP
+, 
+r
+->
+cÚÃùiÚ
+->
+log
+, 0, "############## coolplay filter ###############");
+
+167  
+	`ngx_h‰p_Ãxt_h—d”_fž‹r
+(
+r
+);
+
+168 
+	}
+}
+
+172 
+	$ngx_h‰p_aqb_ý_u£rdefše
+(
+ngx_buf_t
+ *
+b
+, 
+ngx_h‰p_aqb_ý_ùx_t
+ *
+ùx
+)
+
+174 
+»t
+ = 0;
+
+180 ifÐ
+»t
+ ){
+
+181 
+ùx
+->
+ok
+ = 1;
+
+183 
+	}
+}
+
+186 
+ngx_št_t
+
+
+187 
+	$ngx_h‰p_aqb_ý_body_fž‹r
+(
+ngx_h‰p_»que¡_t
+ *
+r
+, 
+ngx_chaš_t
+ *
+š
+)
+
+189 
+ngx_h‰p_aqb_ý_ùx_t
+ *
+ùx
+;
+
+190 
+ngx_chaš_t
+ *
+chaš_lšk
+, *
+added_lšk
+;
+
+191 
+cÚš_Ï¡_buf
+ = 0;
+
+192 
+ngx_buf_t
+ *
+b
+;
+
+193 
+ngx_ušt_t
+ 
+i
+;
+
+195 
+ngx_h‰p_aqb_ý_cÚf_t
+ *
+ýcf
+;
+
+196 
+ngx_¡r_t
+ *
+p
+;
+
+198 
+ýcf
+ = 
+r
+->
+loc_cÚf
+[
+ngx_h‰p_aqb_ý_fž‹r_moduË
+.
+ùx_šdex
+];
+
+203 
+	`ngx_log_debug0
+(
+NGX_LOG_DEBUG_HTTP
+, 
+r
+->
+cÚÃùiÚ
+->
+log
+, 0, "############## coolplay filter ###############");
+
+206 ià(
+š
+ =ð
+NULL
+ || 
+r
+->
+h—d”_Úly
+) {
+
+207 
+out
+;
+
+210 
+ùx
+ = 
+	`ngx_h‰p_g‘_moduË_ùx
+(
+r
+, 
+ngx_h‰p_aqb_ý_fž‹r_moduË
+);
+
+211 ià(
+ùx
+ =ð
+NULL
+ ) {
+
+212 
+out
+;
+
+218 
+chaš_lšk
+ = 
+š
+; chaš_lšk; chaš_lšk = chaš_lšk->
+Ãxt
+) {
+
+220 
+	`ngx_h‰p_aqb_ý_u£rdefše
+(
+chaš_lšk
+->
+buf
+, 
+ùx
+);
+
+222 ifÐ
+chaš_lšk
+->
+buf
+->
+Ï¡_buf
+ == 1 ){
+
+223 
+cÚš_Ï¡_buf
+ = 1;
+
+228 ifÐ
+cÚš_Ï¡_buf
+ ){
+
+229 
+p
+ = (
+ngx_¡r_t
+ *)
+ýcf
+->
+¶ugšs
+;
+
+230  
+i
+ = 0; i < 
+ýcf
+->
+¶ugšs
+->
+ÃÉs
+; i++ ){
+
+231 
+b
+ = 
+	`ngx_ÿÎoc_buf
+(
+r
+->
+poÞ
+);
+
+232 ià(
+b
+ =ð
+NULL
+) {
+
+233  
+NGX_ERROR
+;
+
+236 
+b
+->
+pos
+ = 
+p
+[
+i
+].
+d©a
+;
+
+237 
+b
+->
+Ï¡
+ = 
+p
+[
+i
+].
+d©a
+ +…[i].
+Ën
+;
+
+239 
+b
+->
+¡¬t
+ = b->
+pos
+;
+
+240 
+b
+->
+’d
+ = b->
+Ï¡
+;
+
+241 
+b
+->
+memÜy
+ = 1;
+
+242 
+b
+->
+Ï¡_buf
+ = 1;
+
+244 ifÐ
+	`ngx_buf_size
+(
+chaš_lšk
+->
+buf
+) == 0 ){
+
+245 
+chaš_lšk
+->
+buf
+ = 
+b
+;
+
+248 
+added_lšk
+ = 
+	`ngx_®loc_chaš_lšk
+(
+r
+->
+poÞ
+);
+
+249 ià(
+added_lšk
+ =ð
+NULL
+){
+
+250  
+NGX_ERROR
+;
+
+253 
+added_lšk
+->
+buf
+ = 
+b
+;
+
+254 
+added_lšk
+->
+Ãxt
+ = 
+NULL
+;
+
+256 
+chaš_lšk
+->
+Ãxt
+ = 
+added_lšk
+;
+
+257 
+chaš_lšk
+->
+buf
+->
+Ï¡_buf
+ = 0;
+
+259 
+chaš_lšk
+ = 
+added_lšk
+;
+
+264 
+out
+:
+
+265  
+	`ngx_h‰p_Ãxt_body_fž‹r
+(
+r
+, 
+š
+);
+
+266 
+	}
+}
+
+271 
+ngx_št_t
+
+
+272 
+	$ngx_h‰p_aqb_ý_fž‹r_š™
+(
+ngx_cÚf_t
+ *
+cf
+)
+
+274 
+ngx_h‰p_Ãxt_h—d”_fž‹r
+ = 
+ngx_h‰p_tÝ_h—d”_fž‹r
+;
+
+275 
+ngx_h‰p_tÝ_h—d”_fž‹r
+ = 
+ngx_h‰p_aqb_ý_h—d”_fž‹r
+;
+
+277 
+ngx_h‰p_Ãxt_body_fž‹r
+ = 
+ngx_h‰p_tÝ_body_fž‹r
+;
+
+278 
+ngx_h‰p_tÝ_body_fž‹r
+ = 
+ngx_h‰p_aqb_ý_body_fž‹r
+;
+
+280  
+NGX_OK
+;
+
+281 
+	}
+}
+
+286 
+	$ngx_h‰p_aqb_ý_ü—‹_cÚf
+(
+ngx_cÚf_t
+ *
+cf
+)
+
+288 
+ngx_h‰p_aqb_ý_cÚf_t
+ *
+ýcf
+;
+
+290 
+ýcf
+ = 
+	`ngx_pÿÎoc
+(
+cf
+->
+poÞ
+, (
+ngx_h‰p_aqb_ý_cÚf_t
+));
+
+291 ià(
+ýcf
+ =ð
+NULL
+) {
+
+292  
+NGX_CONF_ERROR
+;
+
+295 
+ýcf
+->
+ý_’abË
+ = 
+NGX_CONF_UNSET
+;
+
+296  
+ýcf
+;
+
+297 
+	}
+}
+
+301 
+	$ngx_h‰p_aqb_ý_m”ge_cÚf
+(
+ngx_cÚf_t
+ *
+cf
+, *
+·»Á
+, *
+chžd
+)
+
+303 
+ngx_h‰p_aqb_ý_cÚf_t
+ *
+´ev
+ = 
+·»Á
+;
+
+304 
+ngx_h‰p_aqb_ý_cÚf_t
+ *
+cÚf
+ = 
+chžd
+;
+
+306 
+	`ngx_cÚf_m”ge_v®ue
+(
+cÚf
+->
+ý_’abË
+, 
+´ev
+->cp_enable, 0);
+
+308  
+NGX_CONF_OK
+;
+
+309 
+	}
+}
+
 	@modules/mod_breakpoint/ngx_http_breakpoint_module.c
 
 2 
@@ -463997,7 +465041,7 @@ d©a
 u_ch¬
  *è
 	)
-text
+‹xt
 
 	@modules/mod_headers_more/src/ngx_http_headers_more_headers_in.c
 
@@ -517809,8 +518853,8 @@ NULL
 1
 .
 0
-273
-8042
+274
+8090
 core/nginx.c
 core/nginx.h
 core/ngx_array.c
@@ -517993,6 +519037,7 @@ mail/ngx_mail_smtp_module.h
 mail/ngx_mail_ssl_module.c
 mail/ngx_mail_ssl_module.h
 misc/ngx_google_perftools_module.c
+modules/mod_aqb/ngx_http_aqb_cp_filter_module.c
 modules/mod_breakpoint/ngx_http_breakpoint_module.c
 modules/mod_capcache/ngx_capcache_module.c
 modules/mod_capcache/ngx_capcache_module.h

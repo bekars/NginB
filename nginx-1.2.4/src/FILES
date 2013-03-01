@@ -87,6 +87,7 @@
 ./modules/mod_headers_more/src/ngx_http_headers_more_filter_module.c
 ./modules/mod_headers_more/src/ngx_http_headers_more_util.c
 ./modules/mod_strip/ngx_http_strip_filter_module.c
+./modules/mod_aqb/ngx_http_aqb_cp_filter_module.c
 ./modules/mod_minify/ngx_http_minify_filter_module_css.c
 ./modules/mod_minify/ngx_http_minify_filter_module.h
 ./modules/mod_minify/ngx_http_minify_filter_module_html.c
