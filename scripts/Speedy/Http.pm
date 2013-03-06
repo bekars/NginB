@@ -8,9 +8,9 @@ require	Exporter;
 
 #class global vars ...
 use vars qw($VERSION @EXPORT @ISA);
-@ISA 		= qw(Exporter);
-@EXPORT		= qw(&getHttpInfo);
-$VERSION	= '1.0.0';
+@ISA     = qw(Exporter);
+@EXPORT  = qw(&getHttpInfo &checkDynPage);
+$VERSION = '1.0.0';
 
 
 sub getHttpInfo($)
@@ -28,13 +28,17 @@ sub getHttpInfo($)
     $curl->setopt(CURLOPT_CONNECTTIMEOUT, 30);
 
     # a filehandle, reference to a scalar or reference to a typeglob can be used here.
+    my $response_header;
     my $response_body;
+    $curl->setopt(CURLOPT_HEADERDATA, \$response_header);
     $curl->setopt(CURLOPT_WRITEDATA, \$response_body);
 
     # start the actual request
     my $retcode = $curl->perform;
 
     # get http info
+    $http_h{HEADER} = $response_header;
+    $http_h{BODY} = $response_body;
     $http_h{HTTP_CODE} = $curl->getinfo(CURLINFO_HTTP_CODE);
     $http_h{SIZE_DOWNLOAD} = $curl->getinfo(CURLINFO_SIZE_DOWNLOAD);
     $http_h{SPEED_DOWNLOAD} = $curl->getinfo(CURLINFO_SPEED_DOWNLOAD);
@@ -61,7 +65,7 @@ sub getHttpInfo($)
     if ($retcode == 0) {
         #print("Transfer went ok\n");
         # judge result and next action based on $response_code
-        #print("Received response: $response_body\n");
+        print("Received response: $response_header\n");
     } else {
         # Error code, type of error, error message
         print("ERR($url): $retcode ".$curl->strerror($retcode)." ".$curl->errbuf."\n");
@@ -70,5 +74,29 @@ sub getHttpInfo($)
     return \%http_h;
 }
 
+sub checkDynPage($)
+{
+    my $httpinfo = shift;
+    if (!defined($httpinfo)) {
+        return 0;
+    }
+ 
+    if ($httpinfo->{HEADER} =~ m/X-Powered-By:\s(.*?)\n/i) {
+        printf("X-Powered: $1\n");
+        if ($1 =~ m/ASP|PHP/i) {
+            return 1;
+        }
+    }
+    
+    if ($httpinfo->{BODY} =~ m/登录|login/i) {
+        printf("FIND LOGIN ...\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+
 1;
+
 

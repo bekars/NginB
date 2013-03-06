@@ -11,7 +11,7 @@ require	Exporter;
 #class global vars ...
 use vars qw($VERSION @EXPORT @ISA);
 @ISA 		= qw(Exporter);
-@EXPORT		= qw(&showHash);
+@EXPORT		= qw(&showHash &removeRN);
 $VERSION	= '1.0.0';
 
 BEGIN
@@ -44,6 +44,29 @@ sub showHash
         }
     }
     printf(");\n");
+}
+
+sub removeRN($)
+{
+    my $str = shift;
+    $$str =~ tr/\r//d;
+    $$str =~ tr/\n//d;
+}
+
+
+sub getNow()
+{
+    my ($sec, $min, $hour, $day, $mon, $year, $weekday, $yeardate, $savinglightday) = (localtime(time));
+
+    $sec  = ($sec < 10) ? "0$sec" : $sec;
+    $min  = ($min < 10) ? "0$min" : $min;
+    $hour = ($hour < 10) ? "0$hour" : $hour;
+    $day  = ($day < 10) ? "0$day" : $day;
+    $mon  = ($mon < 9) ? "0".($mon+1) : ($mon+1);
+    $year += 1900;
+
+    my $today = "$year-$mon-$day $hour:$min:$sec";
+    return $today;
 }
 
 1;
