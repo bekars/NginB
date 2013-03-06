@@ -65,7 +65,7 @@ sub getHttpInfo($)
     if ($retcode == 0) {
         #print("Transfer went ok\n");
         # judge result and next action based on $response_code
-        print("Received response: $response_header\n");
+        #print("Received response: $response_header\n");
     } else {
         # Error code, type of error, error message
         print("ERR($url): $retcode ".$curl->strerror($retcode)." ".$curl->errbuf."\n");
@@ -82,15 +82,15 @@ sub checkDynPage($)
     }
  
     if ($httpinfo->{HEADER} =~ m/X-Powered-By:\s(.*?)\n/i) {
-        printf("X-Powered: $1\n");
+        #printf("X-Powered: $1\n");
         if ($1 =~ m/ASP|PHP/i) {
             return 1;
         }
     }
     
     if ($httpinfo->{BODY} =~ m/登录|login/i) {
-        printf("FIND LOGIN ...\n");
-        return 1;
+        #printf("FIND LOGIN ...\n");
+        return 2;
     }
 
     return 0;
