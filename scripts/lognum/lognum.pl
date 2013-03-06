@@ -7,6 +7,7 @@ use Getopt::Std;
 use Data::Dumper;
 use Speedy::Http;
 use Speedy::Utils;
+use Speedy::AQB;
 use IO::Handle;
 
 my $logdate = "20130227";
@@ -20,7 +21,7 @@ open(FILEINPUT, "<$lognum_file") or do_exit("Can not open file $lognum_file!");
 open(FILEOUTPUT, ">$speedsite_file") or do_exit("Can not open file $speedsite_file!");
 FILEOUTPUT->autoflush(1);
 
-printf(FILEOUTPUT "\$xx = {\n");
+printf(FILEOUTPUT "\$cesu_sites = {\n");
 LOOP: while (<FILEINPUT>) {
     my @line = ($_ =~ m/$reg/);
     if ($#line > 0) {
@@ -36,11 +37,16 @@ LOOP: while (<FILEINPUT>) {
 
             printf("### Get $line[1] Http Info ... ###\n");
             my $httpinfo = getHttpInfo($line[1]);
+            my $siteinfo = getSiteInfo($line[1]);
             showHash($httpinfo, "HINFO_$line[1]");
             if (($httpinfo->{HTTP_CODE} == 200) &&
                 ($httpinfo->{SIZE_DOWNLOAD} > 1000 ))
             {
-                printf(FILEOUTPUT "    \'$line[1]\' => 1,\t\t\t\#$line[0]\n");
+                if ($siteinfo->{config}->{cache} eq "on") {
+                    printf(FILEOUTPUT "    \'$line[1]\' => 1,\t\t\t\#$line[0]\n");
+                } else {
+                    printf(FILEOUTPUT "    \'$line[1]\' => 1,\t\t\t\#$line[0] NOCACHE\n");
+                }
             } else {
                 printf(FILEOUTPUT "    \#NOSITE \'$line[1]\' => 1,\t\t\t\#$line[0]\n");
             }
