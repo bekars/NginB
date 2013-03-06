@@ -39,13 +39,14 @@ sub isDynPage
 {
     my $sites = $cesusites::sites;
     foreach my $key (sort keys %$cesusites::sites) {
+        printf("$key\t");
         my $httpinfo = getHttpInfo($key);
         my $dynpage = checkDynPage($httpinfo);
 
         if ($dynpage > 0) {
-            printf("$key\tDYN_PAGE\tR$dynpage\n");
+            printf("DYN_PAGE\tR$dynpage\n");
         } else {
-            printf("$key\tSTATIC_PAGE\tR$dynpage\n");
+            printf("STATIC_PAGE\tR$dynpage\n");
         }
 
         $|++;
