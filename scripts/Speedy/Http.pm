@@ -74,6 +74,7 @@ sub getHttpInfo($)
     return \%http_h;
 }
 
+use constant {SET_COOKIE=>1, CACHE_CONTROL=>2, X_POWERED_BY=>3, LOGIN=>4};
 sub checkDynPage($)
 {
     my $httpinfo = shift;
@@ -81,16 +82,28 @@ sub checkDynPage($)
         return 0;
     }
  
+    if ($httpinfo->{HEADER} =~ m/Set-Cookie:\s(.*?)\n/i) {
+        #printf("Set-Cookie: $1\n");
+        return SET_COOKIE;
+    }
+    
+    if ($httpinfo->{HEADER} =~ m/Cache-Control:\s(.*?)\n/i) {
+        #printf("Cache-Control: $1\n");
+        if ($1 =~ m/private/i) {
+            return CACHE_CONTROL;
+        }
+    }
+    
     if ($httpinfo->{HEADER} =~ m/X-Powered-By:\s(.*?)\n/i) {
         #printf("X-Powered: $1\n");
         if ($1 =~ m/ASP|PHP/i) {
-            return 1;
+            return X_POWERED_BY;
         }
     }
     
     if ($httpinfo->{BODY} =~ m/登录|login/i) {
         #printf("FIND LOGIN ...\n");
-        return 2;
+        return LOGIN;
     }
 
     return 0;
@@ -98,5 +111,4 @@ sub checkDynPage($)
 
 
 1;
-
 
