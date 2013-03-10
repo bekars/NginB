@@ -21,7 +21,7 @@ use vars qw($VERSION @EXPORT @EXPORT_OK @ISA);
 $VERSION	= '1.0.0';
 
 ## statistic intervals ############################
-my $log_result = "%s/ttl.result";
+my $log_result = "%s/ttl_%s.result";
 our %expires_h = ();
 our @TTL_a = (
     {
@@ -260,7 +260,7 @@ sub ttl_analysis_init($)
         return;
     }
 
-    $log_result = sprintf($log_result, $mod_h->{date});
+    $log_result = sprintf($log_result, $mod_h->{dir}, $mod_h->{date});
 }
 
 1;

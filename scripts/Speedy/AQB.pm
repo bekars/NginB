@@ -12,7 +12,7 @@ require	Exporter;
 #class global vars ...
 use vars qw($VERSION @EXPORT @ISA);
 @ISA 		= qw(Exporter);
-@EXPORT		= qw(&getSiteInfo &getDomainInfo);
+@EXPORT		= qw(&getSiteInfo &getDomainInfo &getScheduleInfo);
 $VERSION	= '1.0.0';
 
 my $dbh;
@@ -56,6 +56,67 @@ END
     $dbh->disconnect();
 }
 
+
+use constant {
+    CONFIG     => 0, 
+    CONFIG_VAL => 1,
+};
+
+sub runSQL($)
+{
+    my @rec_a = ();
+    my @row;
+    my $sql = shift;
+    if (!defined($sql)) {
+        return;
+    }
+
+    #printf("RUNSQL: $sql\n");
+    my $sth = $dbh->prepare($sql);
+    $sth->execute() or die("SQL err: " . $sth->errstr);
+    while (@row = $sth->fetchrow_array) {
+        my @recs = @row;
+        push(@rec_a, \@recs);
+    }
+    $sth->finish();
+
+    return \@rec_a;
+}
+
+use constant {
+    SCHED_ID      => 0,
+    SCHED_NAME    => 1,
+    SCHED_IP      => 2,
+    SCHED_IPALIAS => 3,
+};
+
+sub getScheduleInfo($)
+{
+    my %schedule_h = ();
+    my $siteid = shift;
+    if (!defined($siteid)) {
+        return;
+    }
+
+    my $sql = sprintf("select id,name,ipaddr,ipalias from schedulemap,clusters where id=clusterid and siteid=%d;", $siteid);
+    my $recs = runSQL($sql);
+
+    #printf("### @$recs\n $#$recs\n");
+
+    if ($#$recs > 0) {
+        for (my $i = 0; $i <= $#$recs; $i++) {
+            my %sched_h = ();
+            $sched_h{'id'} = $recs->[$i]->[SCHED_ID];
+            $sched_h{'name'} = $recs->[$i]->[SCHED_NAME];
+            $sched_h{'ip'} = $recs->[$i]->[SCHED_IP];
+            $sched_h{'ipalias'} = $recs->[$i]->[SCHED_IPALIAS];
+            $schedule_h{$recs->[$i]->[SCHED_NAME]} = \%sched_h;
+        }
+    }
+
+    return \%schedule_h;
+}
+
 use constant {
     RECORD_ID        => 0, 
     RECORD_IP        => 1,
@@ -64,11 +125,6 @@ use constant {
     RECORD_DOMAINID  => 4,
     RECORD_REV       => 5,
     RECORD_WHOLENAME => 6,
-};
-
-use constant {
-    CONFIG     => 0, 
-    CONFIG_VAL => 1,
 };
 
 sub getSiteInfo($)
@@ -80,37 +136,32 @@ sub getSiteInfo($)
         return \%site_h;
     }
     
-    my $sql = "select id,ip,type,dns,domain_id,rev,whole_name from records where whole_name='$name'";
-    my $sth = $dbh->prepare($sql);
-    $sth->execute() or die("SQL err: " . $sth->errstr);
-    my @recs = $sth->fetchrow_array;
-    if ($#recs >= 0) {
-        $site_h{'id'} = $recs[RECORD_ID];
-        $site_h{'ip'} = $recs[RECORD_IP];
-        $site_h{'type'} = $recs[RECORD_TYPE];
-        $site_h{'dns'} = $recs[RECORD_DNS];
-        $site_h{'domainid'} = $recs[RECORD_DOMAINID];
-        $site_h{'rev'} = $recs[RECORD_REV];
-        $site_h{'whole_name'} = $recs[RECORD_WHOLENAME];
+    my $sql = "select id,ip,type,dns,domain_id,rev,whole_name from records where whole_name='$name';";
+    my $recs = runSQL($sql);
+    if ($#$recs >= 0) {
+        $site_h{'id'} = $recs->[0]->[RECORD_ID];
+        $site_h{'ip'} = $recs->[0]->[RECORD_IP];
+        $site_h{'type'} = $recs->[0]->[RECORD_TYPE];
+        $site_h{'dns'} = $recs->[0]->[RECORD_DNS];
+        $site_h{'domainid'} = $recs->[0]->[RECORD_DOMAINID];
+        $site_h{'rev'} = $recs->[0]->[RECORD_REV];
+        $site_h{'whole_name'} = $recs->[0]->[RECORD_WHOLENAME];
     } else {
         printf("ERR: site ($name) no find in db!\n");
-        $sth->finish();  
         return \%site_h;
     }
 
     if (exists($site_h{'id'}) and $site_h{'id'} > 0) {
         $sql = "select config, value from site_configswitch where siteid=$site_h{'id'}";
-        $sth = $dbh->prepare($sql);
-        $sth->execute() or die("SQL err: " . $sth->errstr);
-        while (@recs = $sth->fetchrow_array) {
-            $conf_h{$recs[CONFIG]} = $recs[CONFIG_VAL];
+        $recs = runSQL($sql);
+        for (my $i = 0; $i <= $#$recs; $i++) {
+            $conf_h{$recs->[$i]->[CONFIG]} = $recs->[$i]->[CONFIG_VAL];
         }
     }
 
     # fill info
     $site_h{'config'} = \%conf_h;
     
-    $sth->finish();
     return \%site_h;
 }
 
@@ -135,24 +186,20 @@ sub getDomainInfo($)
         return;
     }
 
-    my $sql = "select id,domain,status,user_id,ns,check_time,sitedefault,type,dnsserver,checkin from domain where domain='$name'";
-    my $sth = $dbh->prepare($sql);
-
-    $sth->execute() or die("SQL err: " . $sth->errstr);
-    my @recs = $sth->fetchrow_array;
-    if ($#recs >= 0) {
-        $domain_h{'domain_id'} = $recs[DOMAIN_ID];
-        $domain_h{'domain'} = $recs[DOMAIN];
-        $domain_h{'status'} = $recs[STATUS];
-        $domain_h{'user_id'} = $recs[USER_ID];
-        $domain_h{'ns'} = $recs[NS];
-        $domain_h{'check_time'} = $recs[CHECK_TIME];
-        $domain_h{'sitedefault'} = $recs[SITEDEFAULT];
-        $domain_h{'type'} = $recs[TYPE];
-        $domain_h{'dns_srv'} = $recs[DNS_SRV];
-        $domain_h{'checkin'} = $recs[CHECKIN];
+    my $sql = "select id,domain,status,user_id,ns,check_time,sitedefault,type,dnsserver,checkin from domain where domain='$name';";
+    my $recs = runSQL($sql);
+    if ($#$recs >= 0) {
+        $domain_h{'domain_id'} = $recs->[0]->[DOMAIN_ID];
+        $domain_h{'domain'} = $recs->[0]->[DOMAIN];
+        $domain_h{'status'} = $recs->[0]->[STATUS];
+        $domain_h{'user_id'} = $recs->[0]->[USER_ID];
+        $domain_h{'ns'} = $recs->[0]->[NS];
+        $domain_h{'check_time'} = $recs->[0]->[CHECK_TIME];
+        $domain_h{'sitedefault'} = $recs->[0]->[SITEDEFAULT];
+        $domain_h{'type'} = $recs->[0]->[TYPE];
+        $domain_h{'dns_srv'} = $recs->[0]->[DNS_SRV];
+        $domain_h{'checkin'} = $recs->[0]->[CHECKIN];
     }
-    $sth->finish();  
 
     # fill info
     return \%domain_h;

@@ -12,18 +12,23 @@ use strict;
 require	Exporter;
 
 use Speedy::TTL qw(&get_maxage_interval &get_expired_interval);
+use Speedy::Utils;
 
 use vars qw($VERSION @EXPORT @EXPORT_OK @ISA);
 @ISA 		= qw(Exporter);
-@EXPORT		= qw(%cache_hit_h);
+@EXPORT		= qw(%cache_hit_h %cache_http_status_h %cache_expired_h);
 @EXPORT_OK	= qw(&cachehit_analysis_mod &cachehit_analysis_init &cachehit_result);
 $VERSION	= '1.0.0';
 
 ## statistic intervals ############################
 our %cache_hit_h = ();
-my %cache_http_status_h = ();
-my %cache_expired_h = ();
-my $log_result = "%s/cachehit.result";
+our %cache_http_status_h = ();
+our %cache_expired_h = ();
+
+my $log_result = "%s/cachehit_%s.result";
+my $site_result = "%s/cache_site_%s.result";
+my $domain_flag = "";
+my %cachehit_site_h = ();
 
 sub cache_expired_analysis
 {
@@ -66,7 +71,18 @@ sub cachehit_analysis_init($)
         return;
     }
 
-    $log_result = sprintf($log_result, $mod_h->{date});
+    $log_result = sprintf($log_result, $mod_h->{dir}, $mod_h->{date});
+    $site_result = sprintf($site_result, $mod_h->{dir}, $mod_h->{date});
+}
+
+sub cachehit_site
+{
+    my ($cache_site_h, $node_h) = @_;
+    
+    $cache_site_h->{$node_h->{cache_status}} += 1;
+    $cache_site_h->{TOTAL} += 1;
+    $cache_site_h->{"$node_h->{cache_status}" . "_FLOW"} += $node_h->{http_len};
+    $cache_site_h->{TOTAL_FLOW} += $node_h->{http_len};
 }
 
 sub cachehit_analysis_mod($)
@@ -80,6 +96,14 @@ sub cachehit_analysis_mod($)
     #    ($node_h->{cache_status} eq "")) {
     #    return;
     #}
+
+    if ($node_h->{http_status} ne "200") {
+        return;
+    }
+
+    if ($node_h->{cache_status} eq "") {
+        $node_h->{cache_status} = "NULL";
+    }
     
     $cache_hit_h{$node_h->{cache_status}} += 1;
     $cache_hit_h{TOTAL} += 1;
@@ -91,6 +115,25 @@ sub cachehit_analysis_mod($)
     $cache_http_status_h{TOTAL_FLOW} += $node_h->{http_len};
 
     cache_expired_analysis($node_h);
+
+    # cachehit for per site
+    if ($domain_flag ne $node_h->{domain}) {
+        my %cache_site_h = ();
+        $cache_site_h{'-'} = 0;
+        $cache_site_h{'-_FLOW'} = 0;
+        $cache_site_h{'HIT'} = 0;
+        $cache_site_h{'HIT_FLOW'} = 0;
+        $cache_site_h{'MISS'} = 0;
+        $cache_site_h{'MISS_FLOW'} = 0;
+        $cache_site_h{'EXPIRED'} = 0;
+        $cache_site_h{'EXPIRED_FLOW'} = 0;
+        $cache_site_h{'TOTAL'} = 0;
+        $cache_site_h{'TOTAL_FLOW'} = 0;
+        $cachehit_site_h{$node_h->{domain}} = \%cache_site_h;
+        $domain_flag = $node_h->{domain};
+    }
+
+    cachehit_site($cachehit_site_h{$node_h->{domain}}, $node_h);
 }
 
 sub cachehit_result
@@ -119,6 +162,43 @@ sub cachehit_result
     open(CACHEHIT_FILE, ">$log_result") or return;
     printf(CACHEHIT_FILE $line);
     close(CACHEHIT_FILE);
+
+    open(CACHESITE_FILE, ">$site_result") or return;
+
+    my $total = 0;
+    my $total_flow = 0;
+    foreach my $key (keys %cachehit_site_h) {
+        $total = ($cachehit_site_h{$key}->{HIT} + $cachehit_site_h{$key}->{MISS} + $cachehit_site_h{$key}->{EXPIRED});
+        if (0 == $total) {
+            $cachehit_site_h{$key}->{HITRATE} = -1;
+        } else {
+            $cachehit_site_h{$key}->{HITRATE} = $cachehit_site_h{$key}->{HIT} * 100 / $total;
+        }
+
+        $total_flow = ($cachehit_site_h{$key}->{HIT_FLOW} + $cachehit_site_h{$key}->{MISS_FLOW} + $cachehit_site_h{$key}->{EXPIRED_FLOW});
+        if (0 == $total_flow) {
+            $cachehit_site_h{$key}->{HITRATE_FLOW} = -1;
+        } else {
+            $cachehit_site_h{$key}->{HITRATE_FLOW} = $cachehit_site_h{$key}->{HIT_FLOW} * 100 / $total_flow;
+        }
+
+        if ((0 == $cachehit_site_h{$key}->{TOTAL}) ||
+            (0 == $cachehit_site_h{$key}->{TOTAL_FLOW})) {
+            $cachehit_site_h{$key}->{CACHERATE} = -1;
+            $cachehit_site_h{$key}->{CACHERATE_FLOW} = -1;
+        } else {
+            $cachehit_site_h{$key}->{CACHERATE} = $total * 100 / $cachehit_site_h{$key}->{TOTAL};
+            $cachehit_site_h{$key}->{CACHERATE_FLOW} = $total_flow * 100 / $cachehit_site_h{$key}->{TOTAL_FLOW};
+        }
+
+        printf(CACHESITE_FILE "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", 
+            $key,
+            roundFloat($cachehit_site_h{$key}->{HITRATE}), roundFloat($cachehit_site_h{$key}->{HITRATE_FLOW}), 
+            roundFloat($cachehit_site_h{$key}->{CACHERATE}), roundFloat($cachehit_site_h{$key}->{CACHERATE_FLOW}),
+            $cachehit_site_h{$key}->{TOTAL}, $cachehit_site_h{$key}->{TOTAL_FLOW},
+        );
+    }
+    close(CACHESITE_FILE);
 }
 
 BEGIN

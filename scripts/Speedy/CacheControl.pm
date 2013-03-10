@@ -8,18 +8,20 @@
 ## Global Stuff ###################################
 package	Speedy::CacheControl;
 use strict;
+use IO::Handle;
 require	Exporter;
 
 use vars qw($VERSION @EXPORT @EXPORT_OK @ISA);
 @ISA 		= qw(Exporter);
 @EXPORT		= qw();
-@EXPORT_OK	= qw(&cachecontrol_analysis_mod);
+@EXPORT_OK	= qw(&cachecontrol_analysis_mod &cachecontrol_analysis_init);
 $VERSION	= '1.0.0';
 
 ## statistic intervals ############################
-my $logfile = "cache_control.result";
+my $log_result = "%s/cache_ctrl_%s.result";
 my $cc_maxage_reg = qr/.*max-age=(.*?)(|,.*|\s.*)$/;
 my $cc_nocache_reg = qr/.*public.*/;
+my $start = 1;
 
 sub cachecontrol_analysis_mod($)
 {
@@ -44,21 +46,33 @@ sub cachecontrol_analysis_mod($)
 sub cachecontrol_dump_log
 {
     my $line = shift;
-    open(CC_FILE, ">>$logfile") or return;
+    if ($start) {
+        open(CC_FILE, ">$log_result") or return;
+        CC_FILE->autoflush(1);
+        $start = 0;
+    }
+
     $line =~ tr/%/#/;
     printf(CC_FILE $line);
-    close(CC_FILE);
+}
+
+sub cachecontrol_analysis_init($)
+{
+    my $mod_h = shift;
+    if (!defined($mod_h)) {
+        return;
+    }
+
+    $log_result = sprintf($log_result, $mod_h->{dir}, $mod_h->{date});
 }
 
 BEGIN
 {
-    my $logfile = "cache_control.result";
-    open(CC_FILE, ">$logfile") or return;
-    close(CC_FILE);
 }
 
 END
 {
+    close(CC_FILE);
 }
 
 1;

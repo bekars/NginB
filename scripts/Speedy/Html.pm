@@ -20,7 +20,7 @@ use vars qw($VERSION @EXPORT @EXPORT_OK @ISA);
 $VERSION	= '1.0.0';
 
 ## statistic intervals ############################
-my $log_result = "%s/html.result";
+my $log_result = "%s/html_%s.result";
 our %html_http_header_h = ();
 
 
@@ -74,7 +74,7 @@ sub html_analysis_init($)
         return;
     }
 
-    $log_result = sprintf($log_result, $mod_h->{date});
+    $log_result = sprintf($log_result, $mod_h->{dir}, $mod_h->{date});
     open(RESULTFILE, ">$log_result");
     close(RESULTFILE);
 }
