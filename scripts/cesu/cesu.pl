@@ -9,10 +9,17 @@ use Data::Dumper;
 require "sites.pl";
 
 # delete config cache=off site from cesu result
-sub removeCacheOff()
+sub removeCacheOff($)
 {
-    my $inf = "/home/baiyu/Dropbox/Cesu/results/speed_sort.2013-03-02~2013-03-03.txt";
-    my $outf = "cesu.result";
+    my $time = shift;
+    my $inf = "speed_sort.". $time . ".txt";
+    my $outf = "cesu_" . $time . ".result";
+    my %rate = (
+        'TOTAL' => 0,
+        'SLOW' => 0,
+        'FAST' => 0,
+        'SAME' => 0,
+    );
 
     open(INFD, $inf);
     open(OUTFD, ">" . $outf);
@@ -26,10 +33,32 @@ sub removeCacheOff()
         if ((!exists($site->{config}->{cache})) ||
             (exists($site->{config}->{cache}) && ($site->{config}->{cache} eq "on"))) 
         {
-            printf($arr[0]."\t".$arr[1]."\n");
+            printf(OUTFD $arr[0]."\t".$arr[1]."\n");
+
+            $rate{TOTAL} += 1;
+            if ($arr[0] < -0.1) {
+                $rate{SLOW} += 1;
+            } elsif ($arr[0] > 0.1) {
+                $rate{FAST} += 1;
+            } else {
+                $rate{SAME} += 1;
+            }
         }
     }
 
+    $rate{FAST_RATE} = $rate{FAST} * 100 / $rate{TOTAL};
+    $rate{FAST_RATE} = sprintf("%.2f", $rate{FAST_RATE});
+    $rate{SLOW_RATE} = $rate{SLOW} * 100 / $rate{TOTAL};
+    $rate{SLOW_RATE} = sprintf("%.2f", $rate{SLOW_RATE});
+    $rate{SAME_RATE} = $rate{SAME} * 100 / $rate{TOTAL};
+    $rate{SAME_RATE} = sprintf("%.2f", $rate{SAME_RATE});
+    showHash(\%rate);
+            
+    printf(OUTFD "FAST: $rate{FAST_RATE}\t" . 
+        "SLOW: $rate{SLOW_RATE}\t" .
+        "SAME: $rate{SAME_RATE}\t" .
+        "TOTAL: $rate{TOTAL}\n");
+    
     close(INFD);
     close(OUTFD);
 }
@@ -53,7 +82,17 @@ sub isDynPage
     }
 }
 
-isDynPage();
+#isDynPage();
+
+my $time = "2013-03-08~2013-03-09";
+removeCacheOff($time);
+exit(0);
+
+for (my $i=1; $i<=7; $i++) {
+    my $j = $i + 1;
+    $time = "2013-03-0$i~2013-03-0$j";
+    removeCacheOff($time);
+}
 
 1;
 

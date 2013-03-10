@@ -12,8 +12,8 @@ use Getopt::Std;
 use Data::Dumper;
 use Date::Parse;
 use Speedy::TTL qw(&ttl_analysis_mod &ttl_analysis_init &ttl_result &get_maxage_interval &get_expired_interval %expires_h);
-use Speedy::CacheControl qw(&cachecontrol_analysis_mod);
-use Speedy::CacheHit qw(&cachehit_analysis_mod &cachehit_analysis_init &cachehit_result %cache_hit_h);
+use Speedy::CacheControl qw(&cachecontrol_analysis_mod &cachecontrol_analysis_init);
+use Speedy::CacheHit qw(&cachehit_analysis_mod &cachehit_analysis_init &cachehit_result %cache_hit_h %cache_http_status_h %cache_expired_h);
 use Speedy::Utils qw(&showHash);
 use Speedy::Html qw(&html_analysis_mod &html_analysis_init %html_http_header_h);
 use IO::Handle;
@@ -22,18 +22,20 @@ my %options = ();
 my $startime = new Benchmark;
 
 my $home_dir = "/var/BLOGS/logs/";
+my $log_time = "20130216";
 my $debug = 0;
 my $debuglog = 0;
 
+my %mod_h = ();
 
 sub mod_init
 {
-    my %mod_h = (
-        date => $options{t},
-    );
+    $mod_h{date} = $log_time;
+    $mod_h{dir} = "SPD_$log_time";
 
     ttl_analysis_init(\%mod_h);
     cachehit_analysis_init(\%mod_h);
+    cachecontrol_analysis_init(\%mod_h);
     html_analysis_init(\%mod_h);
 }
 
@@ -184,18 +186,18 @@ sub analysis
     my %node_h = (
         domain          => $domain,
         log             => $log,
-        time            => $log_data_a->[0],
+        time            => $log_data_a->[TIME],
         http_method     => $http_method,
         http_url        => $http_url,
         http_arg        => $http_arg,
         http_suffix     => $http_suffix,
-        http_status     => $log_data_a->[2],
-        http_len        => $log_data_a->[3],
-        cache_status    => $log_data_a->[4],
-        cache_expired   => $log_data_a->[5],
-        cache_control   => $log_data_a->[6],
-        http_etag       => $log_data_a->[7],
-        http_lastmodify => $log_data_a->[8],
+        http_status     => $log_data_a->[STATUS],
+        http_len        => $log_data_a->[LENGTH],
+        cache_status    => $log_data_a->[CACHE_STATUS],
+        cache_expired   => $log_data_a->[EXPIRED],
+        cache_control   => $log_data_a->[CACHE_CONTROL],
+        http_etag       => $log_data_a->[ETAG],
+        http_lastmodify => $log_data_a->[LAST_MODIFIED],
     );
     
     if ($debug) {
@@ -256,7 +258,7 @@ sub parse_log
         return;
     }
 
-    open(FILEHANDLE, $tmpfile) or do_exit("Can not open file $tmpfile!");
+    open(FILEHANDLE, $tmpfile) or log_exit("Can not open file $tmpfile!");
 
     LOOP: while (<FILEHANDLE>) {
         my @line = ($_ =~ m/$reg/);
@@ -297,7 +299,7 @@ sub walk_dir
         $suffix = ".*";
     }
 
-    opendir(DIRHANDLE, $dir) or do_exit("Can not open dir $dir !");
+    opendir(DIRHANDLE, $dir) or log_exit("Can not open dir $dir !");
 
     my @file_a = readdir(DIRHANDLE);
     for my $i (0..$#file_a) {
@@ -309,14 +311,8 @@ sub walk_dir
         }
         $|++;
     }
-    
+ 
     closedir(DIRHANDLE);
-}
-
-sub do_exit
-{
-    my $str = shift;
-    die "$str\n";
 }
 
 sub usage
@@ -354,7 +350,7 @@ if (exists($options{L})) {
 }
 
 if (exists($options{f})) {
-    -e $options{f} or do_exit("ERR: no find file $options{f}!");
+    -e $options{f} or log_exit("ERR: no find file $options{f}!");
 
     if ($options{f} =~ m/.*?access_(.*?)_.*/i) {
         printf("Analysis $1 Log File: $options{f} ...\n\n");
@@ -362,27 +358,28 @@ if (exists($options{f})) {
         parse_log($options{f}, \&analysis, $log_reg, $1);
     }
 } else {
-    if (!exists($options{t})) {
-        usage();
+    if (exists($options{t})) {
+        $log_time = $options{t};
     }
 
     if (exists($options{d})) {
         $home_dir = $options{d};
     }
 
-    mkdir($options{t}, 0755);# or do_exit("ERR: can not mkdir $options{t}!");
+    mkdir("SPD_$log_time", 0755);# or log_exit("ERR: can not mkdir $options{t}!");
     mod_init();
-    walk_dir($home_dir, "log.$options{t}", \&parse_log);
+    walk_dir($home_dir, "log.$log_time", \&parse_log);
 }
 
-showHash(\%cache_hit_h, "CACHE_HIT");
-#showHash(\%cache_http_status_h, "CACHE_STATUS");
-#showHash(\%cache_expired_h, "CACHE_NOTTL");
-showHash(\%nocache_http_status_h, "NOCACHE_STATUS");
-showHash(\%nocache_http_header_h, "NOCACHE_HEADER");
-showHash(\%nocache_http_suffix_h, "NOCACHE_SUFFIX");
-showHash(\%html_http_header_h, "HTML_HEADER");
-showHash(\%expires_h, "EXPIRED_TTL");
+my $result_file = sprintf("%s/analysis_%s.result", $mod_h{dir}, $mod_h{date});
+showHash(\%cache_hit_h, "CACHE_HIT", $result_file);
+showHash(\%cache_http_status_h, "CACHE_STATUS", $result_file);
+showHash(\%cache_expired_h, "CACHE_NOTTL", $result_file);
+showHash(\%nocache_http_status_h, "NOCACHE_STATUS", $result_file);
+showHash(\%nocache_http_header_h, "NOCACHE_HEADER", $result_file);
+showHash(\%nocache_http_suffix_h, "NOCACHE_SUFFIX", $result_file);
+showHash(\%html_http_header_h, "HTML_HEADER", $result_file);
+showHash(\%expires_h, "EXPIRED_TTL", $result_file);
 
 
 cachehit_result();
