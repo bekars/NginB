@@ -97,7 +97,11 @@ sub cachehit_analysis_mod($)
     #    return;
     #}
 
-    if ($node_h->{http_status} ne "200") {
+    if ($node_h->{http_status} eq "404") {
+        return;
+    }
+
+    if ($node_h->{cache_control} =~ m/private|no-cache|no-store/i) {
         return;
     }
 
@@ -142,27 +146,6 @@ sub cachehit_result
         return 0;
     }
 
-    # HIT   MISS    EXPIRED     -   TOTAL   HIT_RATE    CACHE_RATE
-    $cache_hit_h{HITRATE} = $cache_hit_h{HIT} * 100 / ($cache_hit_h{HIT} + $cache_hit_h{MISS} + $cache_hit_h{EXPIRED});
-    $cache_hit_h{HITRATE_FLOW} = $cache_hit_h{HIT_FLOW} * 100 / ($cache_hit_h{HIT_FLOW} + $cache_hit_h{MISS_FLOW} + $cache_hit_h{EXPIRED_FLOW});
-    $cache_hit_h{CACHERATE} = ($cache_hit_h{HIT} + $cache_hit_h{MISS} + $cache_hit_h{EXPIRED}) * 100 / $cache_hit_h{TOTAL};
-    $cache_hit_h{CACHERATE_FLOW} = ($cache_hit_h{HIT_FLOW} + $cache_hit_h{MISS_FLOW} + $cache_hit_h{EXPIRED_FLOW}) * 100 / $cache_hit_h{TOTAL_FLOW};
-    
-    my $line = sprintf("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t" .
-                       "%s\t%s\t%s\t%s\t%s\t%s\n",
-                   $cache_hit_h{HIT}, $cache_hit_h{HIT_FLOW},
-                   $cache_hit_h{MISS}, $cache_hit_h{MISS_FLOW},
-                   $cache_hit_h{EXPIRED}, $cache_hit_h{EXPIRED_FLOW},
-                   $cache_hit_h{'-'}, $cache_hit_h{'-_FLOW'},
-                   $cache_hit_h{TOTAL}, $cache_hit_h{TOTAL_FLOW},
-                   $cache_hit_h{HITRATE}, $cache_hit_h{HITRATE_FLOW},
-                   $cache_hit_h{CACHERATE}, $cache_hit_h{CACHERATE_FLOW},
-               );
-
-    open(CACHEHIT_FILE, ">$log_result") or return;
-    printf(CACHEHIT_FILE $line);
-    close(CACHEHIT_FILE);
-
     open(CACHESITE_FILE, ">$site_result") or return;
 
     my $total = 0;
@@ -191,14 +174,37 @@ sub cachehit_result
             $cachehit_site_h{$key}->{CACHERATE_FLOW} = $total_flow * 100 / $cachehit_site_h{$key}->{TOTAL_FLOW};
         }
 
-        printf(CACHESITE_FILE "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", 
+        printf(CACHESITE_FILE "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", 
             $key,
             roundFloat($cachehit_site_h{$key}->{HITRATE}), roundFloat($cachehit_site_h{$key}->{HITRATE_FLOW}), 
             roundFloat($cachehit_site_h{$key}->{CACHERATE}), roundFloat($cachehit_site_h{$key}->{CACHERATE_FLOW}),
+            $cachehit_site_h{$key}->{HIT}, $cachehit_site_h{$key}->{MISS}, $cachehit_site_h{$key}->{EXPIRED},
             $cachehit_site_h{$key}->{TOTAL}, $cachehit_site_h{$key}->{TOTAL_FLOW},
         );
     }
     close(CACHESITE_FILE);
+    
+    
+    # HIT   MISS    EXPIRED     -   TOTAL   HIT_RATE    CACHE_RATE
+    $cache_hit_h{HITRATE} = $cache_hit_h{HIT} * 100 / ($cache_hit_h{HIT} + $cache_hit_h{MISS} + $cache_hit_h{EXPIRED});
+    $cache_hit_h{HITRATE_FLOW} = $cache_hit_h{HIT_FLOW} * 100 / ($cache_hit_h{HIT_FLOW} + $cache_hit_h{MISS_FLOW} + $cache_hit_h{EXPIRED_FLOW});
+    $cache_hit_h{CACHERATE} = ($cache_hit_h{HIT} + $cache_hit_h{MISS} + $cache_hit_h{EXPIRED}) * 100 / $cache_hit_h{TOTAL};
+    $cache_hit_h{CACHERATE_FLOW} = ($cache_hit_h{HIT_FLOW} + $cache_hit_h{MISS_FLOW} + $cache_hit_h{EXPIRED_FLOW}) * 100 / $cache_hit_h{TOTAL_FLOW};
+    
+    my $line = sprintf("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t" .
+                       "%s\t%s\t%s\t%s\t%s\t%s\n",
+                   $cache_hit_h{HIT}, $cache_hit_h{HIT_FLOW},
+                   $cache_hit_h{MISS}, $cache_hit_h{MISS_FLOW},
+                   $cache_hit_h{EXPIRED}, $cache_hit_h{EXPIRED_FLOW},
+                   $cache_hit_h{'-'}, $cache_hit_h{'-_FLOW'},
+                   $cache_hit_h{TOTAL}, $cache_hit_h{TOTAL_FLOW},
+                   $cache_hit_h{HITRATE}, $cache_hit_h{HITRATE_FLOW},
+                   $cache_hit_h{CACHERATE}, $cache_hit_h{CACHERATE_FLOW},
+               );
+
+    open(CACHEHIT_FILE, ">$log_result") or return;
+    printf(CACHEHIT_FILE $line);
+    close(CACHEHIT_FILE);
 }
 
 BEGIN

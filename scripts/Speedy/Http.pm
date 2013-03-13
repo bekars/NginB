@@ -84,16 +84,21 @@ sub checkDynPage($)
  
     if ($httpinfo->{HEADER} =~ m/Set-Cookie:\s(.*?)\n/i) {
         #printf("Set-Cookie: $1\n");
-        return SET_COOKIE;
+#        return SET_COOKIE;
     }
     
     if ($httpinfo->{HEADER} =~ m/Cache-Control:\s(.*?)\n/i) {
         #printf("Cache-Control: $1\n");
         if ($1 =~ m/private/i) {
-            return CACHE_CONTROL;
+#            return CACHE_CONTROL;
         }
     }
     
+    if ($httpinfo->{BODY} =~ m/登录|密码|login/i) {
+        #printf("FIND LOGIN ...\n");
+        return LOGIN;
+    }
+
     if ($httpinfo->{HEADER} =~ m/X-Powered-By:\s(.*?)\n/i) {
         #printf("X-Powered: $1\n");
         if ($1 =~ m/ASP|PHP/i) {
@@ -101,11 +106,6 @@ sub checkDynPage($)
         }
     }
     
-    if ($httpinfo->{BODY} =~ m/登录|login/i) {
-        #printf("FIND LOGIN ...\n");
-        return LOGIN;
-    }
-
     return 0;
 }
 

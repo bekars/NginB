@@ -103,7 +103,7 @@ sub getScheduleInfo($)
 
     #printf("### @$recs\n $#$recs\n");
 
-    if ($#$recs > 0) {
+    if ($#$recs > -1) {
         for (my $i = 0; $i <= $#$recs; $i++) {
             my %sched_h = ();
             $sched_h{'id'} = $recs->[$i]->[SCHED_ID];
