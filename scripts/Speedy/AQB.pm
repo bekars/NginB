@@ -23,6 +23,9 @@ sub load_db_config
     my $conf_file_path = '/etc/antnest.conf.net';
     open(DB_CONFIG, $conf_file_path) or die("ERR: can't open $conf_file_path : $!");
 
+    $dbname = "owdb";
+    $dbport = 3306;
+
     while (<DB_CONFIG>) {
         if (m/^DBHOST=(\S+)/) {
             $dbhost = $1;	
@@ -73,7 +76,7 @@ sub runSQL($)
 
     #printf("RUNSQL: $sql\n");
     my $sth = $dbh->prepare($sql);
-    $sth->execute() or die("SQL err: " . $sth->errstr);
+    $sth->execute() or die("SQL err: [$sql]" . "(" . length($sql) .")" . $sth->errstr);
     while (@row = $sth->fetchrow_array) {
         my @recs = @row;
         push(@rec_a, \@recs);
@@ -125,6 +128,7 @@ use constant {
     RECORD_DOMAINID  => 4,
     RECORD_REV       => 5,
     RECORD_WHOLENAME => 6,
+    SITE_REV         => 0, 
 };
 
 sub getSiteInfo($)
@@ -136,7 +140,7 @@ sub getSiteInfo($)
         return \%site_h;
     }
     
-    my $sql = "select id,ip,type,dns,domain_id,rev,whole_name from records where whole_name='$name';";
+    my $sql = sprintf("select id,ip,type,dns,domain_id,rev,whole_name from records where whole_name='%s';", $name);
     my $recs = runSQL($sql);
     if ($#$recs >= 0) {
         $site_h{'id'} = $recs->[0]->[RECORD_ID];
@@ -144,7 +148,7 @@ sub getSiteInfo($)
         $site_h{'type'} = $recs->[0]->[RECORD_TYPE];
         $site_h{'dns'} = $recs->[0]->[RECORD_DNS];
         $site_h{'domainid'} = $recs->[0]->[RECORD_DOMAINID];
-        $site_h{'rev'} = $recs->[0]->[RECORD_REV];
+        $site_h{'rev_record'} = $recs->[0]->[RECORD_REV];
         $site_h{'whole_name'} = $recs->[0]->[RECORD_WHOLENAME];
     } else {
         printf("ERR: site ($name) no find in db!\n");
@@ -157,6 +161,10 @@ sub getSiteInfo($)
         for (my $i = 0; $i <= $#$recs; $i++) {
             $conf_h{$recs->[$i]->[CONFIG]} = $recs->[$i]->[CONFIG_VAL];
         }
+
+        $sql = "select rev from sites where siteid=$site_h{'id'}";
+        $recs = runSQL($sql);
+        $site_h{'rev_site'} = $recs->[0]->[SITE_REV];
     }
 
     # fill info

@@ -6,13 +6,14 @@
 ## Global Stuff ###################################
 package	Speedy::Utils;
 use		strict;
+use     POSIX qw(setsid);
 require	Exporter;
 
 #class global vars ...
 use vars qw($VERSION @EXPORT @ISA);
-@ISA 		= qw(Exporter);
-@EXPORT		= qw($log_exit &showHash &removeRN &roundFloat);
-$VERSION	= '1.0.0';
+@ISA     = qw(Exporter);
+@EXPORT  = qw($log_exit &showHash &removeRN &roundFloat &getHashLen);
+$VERSION = '1.0.0';
 
 BEGIN
 {
@@ -44,10 +45,10 @@ sub showHash
             $key_tmp = $key;
             $key_tmp =~ tr/%/#/;
             $key_tmp =~ tr/'/*/;
-            if ($hash->{$key}) {
+            if (exists($hash->{$key}) && defined($hash->{$key})) {
                 printf("       \'$key_tmp\' => $hash->{$key},\n");
             } else {
-                printf("       \'$key_tmp\' => NONE,\n");
+                printf("       \'$key_tmp\' => NULL,\n");
             }
         }
         printf(");\n");
@@ -99,6 +100,23 @@ sub roundFloat($)
     $str = sprintf($format, $str);
     return $str;
 }
+
+sub getHashLen($)
+{
+    my $hashref = shift;
+    my $len = keys %$hashref;
+    return $len;
+}
+
+sub daemonize()
+{
+    chdir '/'                 or die "Can't chdir to /: $!";
+    defined(my $pid = fork)   or die "Can't fork: $!";
+    exit if $pid;
+    setsid                    or die "Can't start a new session: $!";
+    umask 0;
+}
+
 
 1;
 
