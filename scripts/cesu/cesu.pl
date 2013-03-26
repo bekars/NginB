@@ -20,6 +20,7 @@ sub removeCacheOff($)
         'FAST' => 0,
         'SAME' => 0,
         'BIGZERO' => 0,
+        'LESSZERO' => 0,
         'ZIP' => 0,
     );
 
@@ -32,8 +33,8 @@ sub removeCacheOff($)
         removeRN(\$arr[1]);
 
         my $site = getSiteInfo($arr[1]);
-        if (((exists($site->{config}->{cache})) && ($site->{config}->{cache} eq "on")) ||
-            ((exists($site->{config}->{cachesize})) && ($site->{config}->{cachesize} > 0))) 
+        if (((exists($site->{config}->{cache})) && ($site->{config}->{cache} eq "on")) || 
+            ((exists($site->{config}->{page_speed_up})) && ($site->{config}->{page_speed_up} eq "on")))
         {
             my $sched = getScheduleInfo($site->{id});
             if (getHashLen($sched) > 3) {
@@ -51,6 +52,9 @@ sub removeCacheOff($)
                 if ($arr[0] > 0) {
                     $rate{BIGZERO} += 1;
                     $rate{BIGZERO_CNT} += $arr[0];
+                } else {
+                    $rate{LESSZERO} += 1;
+                    $rate{LESSZERO_CNT} += $arr[0];
                 }
            } else {
                printf("### OUT site: %s\n", $arr[1]);
@@ -80,13 +84,16 @@ sub removeCacheOff($)
     $rate{BIGZ_RATE} = roundFloat($rate{BIGZ_RATE});
     $rate{FAST_AVG}  = $rate{BIGZERO_CNT} / $rate{BIGZERO};
     $rate{FAST_AVG}  = roundFloat($rate{FAST_AVG});
+    $rate{SLOW_AVG}  = $rate{LESSZERO_CNT} / $rate{LESSZERO};
+    $rate{SLOW_AVG}  = roundFloat($rate{SLOW_AVG});
     showHash(\%rate);
 
     printf(OUTFD "FAST: $rate{FAST_RATE}\t" . 
         "SLOW: $rate{SLOW_RATE}\t" .
         "SAME: $rate{SAME_RATE}\t" .
         "BIGZ: $rate{BIGZ_RATE}\t" .
-        "FAVG: $rate{FAST_AVG}\t" .
+        "FASTAVG: $rate{FAST_AVG}\t" .
+        "SLOWAVG: $rate{SLOW_AVG}\t" .
         "ZIP: $rate{ZIP}\t" .
         "TOTAL: $rate{TOTAL}\n");
     
@@ -116,7 +123,7 @@ sub isDynPage
 
 #isDynPage();exit(0);
 
-my $time = "2013-03-21~2013-03-22";
+my $time = "2013-03-24~2013-03-25";
 removeCacheOff($time);
 exit(0);
 
