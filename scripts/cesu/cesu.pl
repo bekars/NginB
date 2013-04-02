@@ -13,7 +13,7 @@ sub removeCacheOff($)
 {
     my $time = shift;
     my $inf = "speed_sort.". $time . ".txt";
-    my $outf = "cesu_" . $time . ".result";
+    my $outf = "cesu_" . $time . ".txt";
     my %rate = (
         'TOTAL' => 0,
         'SLOW' => 0,
@@ -69,7 +69,7 @@ sub removeCacheOff($)
             ($site->{config}->{zip} eq "on")) 
         {
             $rate{ZIP} += 1;
-            printf("\t\"$arr[1]\",\n");
+            #printf("\t\"$arr[1]\",\n");
         }
 #=cut
     }
@@ -123,7 +123,7 @@ sub isDynPage
 
 #isDynPage();exit(0);
 
-my $time = "2013-03-24~2013-03-25";
+my $time = "2013-03-01~2013-03-31";
 removeCacheOff($time);
 exit(0);
 
