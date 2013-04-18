@@ -1,10 +1,18 @@
 TOP_PATH          = /home/baiyu/GitHub/NginB
 NGX_PATH          = $(TOP_PATH)/nginx-1.2.4
 NGX_MOD_PATH      = $(TOP_PATH)/modules
-NGX_MOD_MORE_PATH = /home/baiyu/GitHub
+NGX_MOD_MORE_PATH = $(NGX_PATH)/src/nginx_mods
 
-NGX_MOD_CONFIG    = --with-http_ssl_module \
+NGX_MOD_CONFIG    = \
+	--http-proxy-temp-path=/data/nginx/cache_tmp \
+	--error-log-path=/var/log/error.log \
+	--pid-path=/var/run/nginx.pid \
+	--with-pcre \
+	--with-poll_module \
+	--http-fastcgi-temp-path=/data/nginx/fcgi/ \
+	--with-http_ssl_module \
 	--with-http_sub_module \
+	--with-http_stub_status_module \
 	--add-module=${NGX_MOD_MORE_PATH}/echo-nginx-module \
 	--add-module=${NGX_MOD_MORE_PATH}/ngx_devel_kit \
 	--add-module=${NGX_MOD_MORE_PATH}/lua-nginx-module \
@@ -13,7 +21,8 @@ NGX_MOD_CONFIG    = --with-http_ssl_module \
 	--add-module=${NGX_MOD_PATH}/mod_breakpoint \
 	--add-module=${NGX_MOD_PATH}/mod_minify \
 	--add-module=${NGX_MOD_PATH}/mod_capcache \
-	--add-module=${NGX_MOD_PATH}/mod_aqb
+	--add-module=${NGX_MOD_PATH}/mod_aqb \
+	--add-module=${NGX_MOD_MORE_PATH}/srcache-nginx-module
 		
 #NGX_MOD_CONFIG   += --add-module=${NGX_MOD_MORE_PATH}/ngx_pagespeed
 
