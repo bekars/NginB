@@ -16,7 +16,7 @@ use DBI;
 
 my $dr_sites = {};
 my $date_g = "20130422";
-my $limit_g = "limit 1000";#"limit 1000";
+my $limit_g = "";#"limit 1000";
 my $fp;
 my $cluster;
 
@@ -84,10 +84,10 @@ use constant {
 sub walk_slow_url()
 {
     my $node;
-    my $sql = sprintf("select role_name,url,tcp_time_s,res_time_s,down_time_s,role_ip,client_ip,header,monitor_time from speed_res_data_%s where role_name like '%%%%_aqb' and (res_time_s>3 or tcp_time_s>1 or down_time_s>10) %s;", $date_g, $limit_g);
+    my $sql = sprintf("select role_name,url,tcp_time_s,res_time_s,down_time_s,role_ip,client_ip,header,monitor_time from speed_res_data_%s where role_name like '%%%%_aqb' and (tcp_time_s>1 or res_time_s>3 or down_time_s>10) %s;", $date_g, $limit_g);
     my $recs_aqb = runSQL($sql);
 
-    for (my $i = 0; $i <= $#$recs_aqb; $i++) {
+    LOOP: for (my $i = 0; $i <= $#$recs_aqb; $i++) {
         $node->{role_name} = $recs_aqb->[$i]->[ROLE_NAME];
         $node->{url} = $recs_aqb->[$i]->[URL];
         $node->{url} =~ tr/%/#/;
@@ -106,6 +106,7 @@ sub walk_slow_url()
         } else {
             $node->{cluster} = "UNKNOWN";
             #printf("### $recs_aqb->[$i]->[HEADER] ###");
+            next LOOP;
         }
         if ($recs_aqb->[$i]->[ROLE_NAME] =~ m/^(.*?)_.*$/) {
             $node->{site} = $1;
@@ -120,13 +121,10 @@ sub walk_slow_url()
         ($node->{srv_country}, $node->{srv_loc}, $node->{srv_isp}) = match_ip_pos($node->{srv_ip});
         ($node->{site_country}, $node->{site_loc}, $node->{site_isp}) = match_ip_pos($node->{site_ip});
 
-        if ($node->{cluster} ne "UNKNOWN") {
-            statistic_cluster($node);
-        }
+        statistic_cluster($node);
     }
 }
-
-    
+ 
 sub statistic_cluster($)
 {
     my $node = shift;
@@ -255,8 +253,6 @@ sub match_ip_pos($)
     my $ip = shift;
     $ip =~ m/^(\d+?)\.(\d+?)\.(\d+?)\.(\d+?)$/;
     my $ipnum = $1*256*256*256 + $2*256*256 + $3*256 + $4;
-
-    printf("### ipnum: $ipnum\n");
 
     for (my $i = 0; $i <= $#$ip_pos; $i++) {
         if (($ipnum > $ip_pos->[$i]->[IPSTART]) && ($ipnum < $ip_pos->[$i]->[IPEND])) {
