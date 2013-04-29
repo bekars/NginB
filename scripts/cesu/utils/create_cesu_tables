@@ -1,0 +1,59 @@
+CREATE TABLE `cesu_daily` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `bigzero` float NOT NULL DEFAULT '0',
+  `fast` float NOT NULL DEFAULT '0',
+  `slow` float NOT NULL DEFAULT '0',
+  `same` float NOT NULL DEFAULT '0',
+  `fastavg` float NOT NULL DEFAULT '0',
+  `slowavg` float NOT NULL DEFAULT '0',
+  `total` int(10) NOT NULL DEFAULT '0',
+  `all_bigzero` float NOT NULL DEFAULT '0',
+  `all_fastavg` float NOT NULL DEFAULT '0',
+  `all_total` int(10) NOT NULL DEFAULT '0',
+  `time` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `index_time` (`time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE `site_cesu_daily` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `site` varchar(500) NOT NULL,
+  `rate` float NOT NULL DEFAULT '0',
+  `cachehit` float NOT NULL DEFAULT '0',
+  `time` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `index_time` (`time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE `cache_hit` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `cachehit` float NOT NULL DEFAULT '0',
+  `cachehit_flow` float NOT NULL DEFAULT '0',
+  `cacherate` float NOT NULL DEFAULT '0',
+  `cacherate_flow` float NOT NULL DEFAULT '0',
+  `hit` bigint(20) unsigned NOT NULL DEFAULT '0',
+  `hit_flow` bigint(20) unsigned NOT NULL DEFAULT '0',
+  `miss` bigint(20) unsigned NOT NULL DEFAULT '0',
+  `miss_flow` bigint(20) unsigned NOT NULL DEFAULT '0',
+  `expired` bigint(20) unsigned NOT NULL DEFAULT '0',
+  `expired_flow` bigint(20) unsigned NOT NULL DEFAULT '0',
+  `nocached` bigint(20) unsigned NOT NULL DEFAULT '0',
+  `nocached_flow` bigint(20) unsigned NOT NULL DEFAULT '0',
+  `total` bigint(20) unsigned NOT NULL DEFAULT '0',
+  `total_flow` bigint(20) unsigned NOT NULL DEFAULT '0',
+  `time` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `index_time` (`time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE `site_pv_info` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `site` varchar(500) NOT NULL,
+  `pv` bigint(20) unsigned NOT NULL DEFAULT '0',
+  `time` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `index_record_id` (`site`(255)),
+  KEY `index_time` (`time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
