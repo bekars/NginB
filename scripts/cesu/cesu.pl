@@ -72,6 +72,13 @@ sub removeCacheOff($)
             #printf("\t\"$arr[1]\",\n");
         }
 #=cut
+                
+        # calculate all site rate
+        $rate{ALL_TOTAL} += 1;
+        if ($arr[0] > 0) {
+            $rate{ALL_BIGZERO} += 1;
+            $rate{ALL_BIGZERO_CNT} += $arr[0];
+        }
     }
 
     $rate{FAST_RATE} = $rate{FAST} * 100 / $rate{TOTAL};
@@ -86,6 +93,10 @@ sub removeCacheOff($)
     $rate{FAST_AVG}  = roundFloat($rate{FAST_AVG});
     $rate{SLOW_AVG}  = $rate{LESSZERO_CNT} / $rate{LESSZERO};
     $rate{SLOW_AVG}  = roundFloat($rate{SLOW_AVG});
+    $rate{ALLBIGZ_RATE} = $rate{ALL_BIGZERO} * 100 / $rate{ALL_TOTAL};
+    $rate{ALLBIGZ_RATE} = roundFloat($rate{ALLBIGZ_RATE});
+    $rate{ALLFAST_AVG}  = $rate{ALL_BIGZERO_CNT} / $rate{ALL_BIGZERO};
+    $rate{ALLFAST_AVG}  = roundFloat($rate{ALLFAST_AVG});
     showHash(\%rate);
 
     printf(OUTFD "FAST: $rate{FAST_RATE}\t" . 
@@ -94,8 +105,11 @@ sub removeCacheOff($)
         "BIGZ: $rate{BIGZ_RATE}\t" .
         "FASTAVG: $rate{FAST_AVG}\t" .
         "SLOWAVG: $rate{SLOW_AVG}\t" .
-        "ZIP: $rate{ZIP}\t" .
-        "TOTAL: $rate{TOTAL}\n");
+        #"ZIP: $rate{ZIP}\t" .
+        "TOTAL: $rate{TOTAL}\t" .
+        "ALLBIGZ_RATE: $rate{ALLBIGZ_RATE}\t" . 
+        "ALLFAST_AVG: $rate{ALLFAST_AVG}\t" . 
+        "ALL_TOTAL: $rate{ALL_TOTAL}\n");
     
     close(INFD);
     close(OUTFD);
@@ -123,24 +137,24 @@ sub isDynPage
 
 #isDynPage();exit(0);
 
-my $time = "2013-03-01~2013-03-31";
+my $time = "2013-04-28~2013-04-29";
 removeCacheOff($time);
 exit(0);
 
 my $tbegin = "";
 my $tend = "";
-for (my $i=9; $i<=13; $i++) {
+for (my $i=11; $i<=17; $i++) {
     my $j = $i + 1;
     if ($i > 9) {
-        $tbegin = "2013-03-$i";
+        $tbegin = "2013-04-$i";
     } else {
-        $tbegin = "2013-03-0$i";
+        $tbegin = "2013-04-0$i";
     }
 
     if ($j > 9) {
-        $tend = "2013-03-$j";
+        $tend = "2013-04-$j";
     } else {
-        $tend = "2013-03-0$j";
+        $tend = "2013-04-0$j";
     }
 
     $time = $tbegin . "~" . $tend;

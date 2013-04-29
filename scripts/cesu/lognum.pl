@@ -10,7 +10,7 @@ use Speedy::Utils;
 use Speedy::AQB;
 use IO::Handle;
 
-my $logdate = "20130227";
+my $logdate = "20130406";
 my $cnt = 0;
 my $lognum_file = "lognum_" . $logdate . ".result";
 my $speedsite_file = "speedsite_" . $logdate . ".result";
@@ -38,11 +38,12 @@ LOOP: while (<FILEINPUT>) {
             printf("### Get $line[1] Http Info ... ###\n");
             my $httpinfo = getHttpInfo($line[1]);
             my $siteinfo = getSiteInfo($line[1]);
-            showHash($httpinfo, "HINFO_$line[1]");
+            #showHash($httpinfo, "HINFO_$line[1]");
             if (($httpinfo->{HTTP_CODE} == 200) &&
                 ($httpinfo->{SIZE_DOWNLOAD} > 1000 ))
             {
-                if ($siteinfo->{config}->{cache} eq "on") {
+                if (($siteinfo->{config}->{cache} eq "on") ||
+                    ($siteinfo->{config}->{page_speed_up} eq "on")) {
                     printf(FILEOUTPUT "    \'$line[1]\' => 1,\t\t\t\#$line[0]\n");
                 } else {
                     printf(FILEOUTPUT "    \'$line[1]\' => 1,\t\t\t\#$line[0] NOCACHE\n");

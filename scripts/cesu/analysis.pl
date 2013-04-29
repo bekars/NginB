@@ -28,7 +28,8 @@ my ($time_start, $time_end) = @ARGV;
 
 my $detail_hash = {};
 #my $filter_hash = do './filter.txt';
-my $mysql_comm = 'mysql -h116.213.78.228 -ucesureadonly -P3306 -p66ecf9c968132321a02e6e7aff34ce5d -P3306 -Dspeed -B -N -e ';
+#my $mysql_comm = 'mysql -h116.213.78.228 -ucesureadonly -p66ecf9c968132321a02e6e7aff34ce5d -P3306 -Dspeed -B -N -e ';
+my $mysql_comm = 'mysql -h59.151.123.74 -ucesu_readonly -p\'Speed@)!@readonly\' -P3307 -Dspeed -B -N -e ';
 my $sql;
 
 #print Dumper($filter_hash);

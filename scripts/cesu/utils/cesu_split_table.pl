@@ -110,8 +110,9 @@ my $create_table_sql = "CREATE TABLE `speed_res_data_%s` (
   `down_speed_kbs` float DEFAULT NULL,
   `monitor_time` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `index_stat_res_main_id` (`stat_main_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=71660944 DEFAULT CHARSET=utf8";
+  KEY `index_stat_res_main_id` (`stat_main_id`),
+  KEY `index_role_name` (`role_name`(32))
+) ENGINE=MyISAM AUTO_INCREMENT=1 DEFAULT CHARSET=utf8";
 
 my $import_data_sql = "insert into speed_res_data_%s (select * from speed_monitor_res_data where monitor_time>'%s 00:00:00' and monitor_time<'%s 00:00:00')";
 

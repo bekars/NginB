@@ -15,7 +15,7 @@ use IO::Handle;
 use DBI;
 
 my $dr_sites = {};
-my $date_g = "20130422";
+my $date_g = "20130426";
 my $limit_g = "";#"limit 1000";
 my $fp;
 my $cluster;
@@ -124,11 +124,14 @@ sub walk_slow_url()
         statistic_cluster($node);
     }
 }
- 
+
+my $counter = 0;
 sub statistic_cluster($)
 {
     my $node = shift;
-        
+
+    $counter += 1;
+    printf("### $counter\n");
     print Dumper($node);
 
     $cluster->{$node->{cluster}} += 1;
@@ -196,28 +199,40 @@ my $country;
 my $province;
 my $isp;
 
-sub load_ip_pos()
+sub load_ip_pos($)
 {
+    my $ipdb = shift;
     my @rec_a = ();
     my @row;
+    my $sql;
+    my $sth;
     my $db_hdl = DBI->connect("DBI:mysql:database=ip;host=116.213.78.197;user=readonly;password=anQuanba0sp11d;port=3306") or die("ConnDB err: " . DBI->errstr);
-    
-    printf("### load ip pos\n");
-    my $sql = "select id,ipstart,ipend,countryid,provinceid,ispid from ip";
-    my $sth = $db_hdl->prepare($sql);
-    $sth->execute() or die("SQL err: [$sql]" . "(" . length($sql) .")" . $sth->errstr);
-    while (@row = $sth->fetchrow_array) {
-        my @rec_data = @row;
-        push(@rec_a, \@rec_data);
-    }
-    $sth->finish();
-    $ip_pos = \@rec_a;
 
     $sql = "set names utf8";
     $sth = $db_hdl->prepare($sql);
     $sth->execute() or die("SQL err: [$sql]" . "(" . length($sql) .")" . $sth->errstr);
     $sth->finish();
 
+    printf("### load ip pos\n");
+    if ($ipdb eq "db") {
+        $sql = "select id,ipstart,ipend,countryid,provinceid,ispid from ip";
+        $sth = $db_hdl->prepare($sql);
+        $sth->execute() or die("SQL err: [$sql]" . "(" . length($sql) .")" . $sth->errstr);
+        while (@row = $sth->fetchrow_array) {
+            my @rec_data = @row;
+            push(@rec_a, \@rec_data);
+        }
+        $sth->finish();
+    } else {
+        open(my $ipfp, "<$ipdb") or die("ERR: can not open $ipdb!\n");
+        while (<$ipfp>) {
+            $_ =~ m/^(.*?)\t(.*?)\t(.*?)\t(.*?)\t(.*?)\t(.*?)/;
+            my @rec_data = ($1, $2, $3, $4, $5, $6);
+            push(@rec_a, \@rec_data);
+        }
+        close($ipfp);
+        $ip_pos = \@rec_a;
+    }
 
     printf("### load country\n");
     $sql = "select id,country from country";
@@ -248,14 +263,31 @@ sub load_ip_pos()
     $db_hdl->disconnect();
 }
 
+
+my @ip_cache = ();
+
 sub match_ip_pos($)
 {
     my $ip = shift;
-    $ip =~ m/^(\d+?)\.(\d+?)\.(\d+?)\.(\d+?)$/;
+    $ip =~ m/^(\d+?)\.(\d+?)\.(\d+?)\.(\d+?).*/;
     my $ipnum = $1*256*256*256 + $2*256*256 + $3*256 + $4;
+
+    for (my $j = 0; $j <= $#ip_cache; $j++) {
+        if ($ip_cache[$j][0] == $ipnum) {
+            printf("### HIT ip cache\n");
+            return ($ip_cache[$j][1], $ip_cache[$j][2], $ip_cache[$j][3]);
+        }
+    }
+
+    if ($#ip_cache > 10000) {
+        shift(@ip_cache);
+    }
 
     for (my $i = 0; $i <= $#$ip_pos; $i++) {
         if (($ipnum > $ip_pos->[$i]->[IPSTART]) && ($ipnum < $ip_pos->[$i]->[IPEND])) {
+            my @c = ($ipnum, $country->{$ip_pos->[$i]->[COUNTRY]},  
+                $province->{$ip_pos->[$i]->[PROVINCE]}, $isp->{$ip_pos->[$i]->[ISP]});
+            push(@ip_cache, \@c);
             return ($country->{$ip_pos->[$i]->[COUNTRY]}, 
                 $province->{$ip_pos->[$i]->[PROVINCE]}, $isp->{$ip_pos->[$i]->[ISP]});
         }
@@ -264,7 +296,8 @@ sub match_ip_pos($)
     return ("UFO", "UFO", "UFO");
 }
 
-load_ip_pos();
+#load_ip_pos("db");
+load_ip_pos("ip_pos.db");
 
 my $driver  = "DBI:mysql";
 load_db_config();
