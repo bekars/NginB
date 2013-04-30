@@ -5,14 +5,18 @@ use Speedy::AQB;
 use Speedy::Utils;
 use Speedy::Http;
 use Data::Dumper;
+use BMD::DBH;
 
-require "sites.pl";
+my $keyword = "total_time";
+my $time_start = "2013-05-01";
+my $time_end = "2013-05-02";
+
+my $site_rate_href = ();
 
 # delete config cache=off site from cesu result
-sub removeCacheOff($)
+sub speed_rate($)
 {
     my $time = shift;
-    my $inf = "speed_sort.". $time . ".txt";
     my $outf = "cesu_" . $time . ".txt";
     my %rate = (
         'TOTAL' => 0,
@@ -24,12 +28,11 @@ sub removeCacheOff($)
         'ZIP' => 0,
     );
 
-    open(INFD, $inf);
     open(OUTFD, ">" . $outf);
 
-    while (<INFD>)
+    foreach my $key (sort {$site_rate_href->{$b} <=> $site_rate_href->{$a}} keys %$site_rate_href) 
     {
-        my @arr = split(/ /, $_);
+        my @arr = ($site_rate_href->{$key}, $key);
         removeRN(\$arr[1]);
 
         my $site = getSiteInfo($arr[1]);
@@ -111,56 +114,172 @@ sub removeCacheOff($)
         "ALLFAST_AVG: $rate{ALLFAST_AVG}\t" . 
         "ALL_TOTAL: $rate{ALL_TOTAL}\n");
     
-    close(INFD);
     close(OUTFD);
+
+    # save to db
+    my $dbh = BMD::DBH->new(
+        'dbhost' => '116.213.78.228',
+        'dbuser' => 'cesureadonly',
+        'dbpass' => '66ecf9c968132321a02e6e7aff34ce5d',
+        'dbname' => 'speed',
+        'dbport' => 3306
+    );
+
+    my $data = {
+        bigzero => $rate{BIGZ_RATE},
+        fast => $rate{FAST_RATE},
+        slow => $rate{SLOW_RATE},
+        same => $rate{SAME_RATE},
+        fastavg => $rate{FAST_AVG},
+        slowavg => $rate{SLOW_AVG},
+        total => $rate{TOTAL},
+        all_bigzero => $rate{ALLBIGZ_RATE},
+        all_fastavg => $rate{ALLFAST_AVG},
+        all_total => $rate{ALL_TOTAL},
+        time => "$time 00:00:00",
+    };
+    $dbh->insert('cesu_daily', $data);
+    $dbh->fini();
 }
 
-# mainpage is dyn-page ?
-sub isDynPage
+sub speed_rate_range()
 {
-    my $sites = $cesusites::sites;
-    foreach my $key (sort keys %$cesusites::sites) {
-        printf("$key\t");
-        my $httpinfo = getHttpInfo($key);
-        my $dynpage = checkDynPage($httpinfo);
-        my $downsize = $httpinfo->{SIZE_DOWNLOAD} / 1000;
-
-        if ($dynpage > 0) {
-            printf("DYN_PAGE\tR$dynpage\t$downsize\n");
+    my $tbegin = "";
+    my $tend = "";
+    for (my $i=11; $i<=17; $i++) {
+        my $j = $i + 1;
+        if ($i > 9) {
+            $tbegin = "2013-04-$i";
         } else {
-            printf("STATIC_PAGE\tR$dynpage\t$downsize\n");
+            $tbegin = "2013-04-0$i";
         }
 
-        $|++;
+        if ($j > 9) {
+            $tend = "2013-04-$j";
+        } else {
+            $tend = "2013-04-0$j";
+        }
+
+        $time = $tbegin . "~" . $tend;
+        printf("### analysis $time ###\n");
+        speed_rate($time);
     }
 }
 
-#isDynPage();exit(0);
 
-my $time = "2013-04-28~2013-04-29";
-removeCacheOff($time);
-exit(0);
+use constant {ORG=>0, AQB=>1, DNS=>2};
 
-my $tbegin = "";
-my $tend = "";
-for (my $i=11; $i<=17; $i++) {
-    my $j = $i + 1;
-    if ($i > 9) {
-        $tbegin = "2013-04-$i";
-    } else {
-        $tbegin = "2013-04-0$i";
-    }
+#my $mysql_comm = 'mysql -h116.213.78.228 -ucesureadonly -p66ecf9c968132321a02e6e7aff34ce5d -P3306 -Dspeed -B -N -e ';
+#my $mysql_comm = 'mysql -h59.151.123.74 -ucesu_readonly -p\'Speed@)!@readonly\' -P3307 -Dspeed -B -N -e ';
+my $detail_href = {};
+sub sort_db_speed(;$$$)
+{
+    my ($keyword, $time_start, $time_end) = @_;
 
-    if ($j > 9) {
-        $tend = "2013-04-$j";
-    } else {
-        $tend = "2013-04-0$j";
-    }
+    my $dbh = BMD::DBH->new(
+        'dbhost' => '116.213.78.228',
+        'dbuser' => 'cesureadonly',
+        'dbpass' => '66ecf9c968132321a02e6e7aff34ce5d',
+        'dbname' => 'speed',
+        'dbport' => 3306
+    );
 
-    $time = $tbegin . "~" . $tend;
-    printf("### analysis $time ###\n");
-    removeCacheOff($time);
+    my $sql;
+
+    # org
+    $sql = qq/select role_id, role_name, round(avg($keyword),4) as a from speed_monitor_data where role_name like "%_ip" and monitor_time > "$time_start" and monitor_time < "$time_end" and total_time != 0 and error_id=0 group by role_id having count(*) > 5 order by a/;
+    fetch_data($dbh->query($sql), ORG);
+
+    # aqb
+    $sql = qq/select role_id, role_name, round(avg($keyword),4) as a from speed_monitor_data where role_name like "%_aqb" and monitor_time > "$time_start" and monitor_time < "$time_end" and total_time != 0 and error_id=0 group by role_id having count(*) > 5 order by a/;
+    fetch_data($dbh->query($sql), AQB);
+
+    # dns
+    $sql = qq/select role_id, role_name, round(avg(dns_time),4) as a from speed_monitor_data where role_name like "%_aqb" and monitor_time > "$time_start" and monitor_time < "$time_end" and total_time != 0 and error_id=0 group by role_id having count(*) > 5 order by a/;
+    fetch_data($dbh->query($sql), DNS);
+
+
+    # debug
+    print Dumper($detail_href);
+
+    # begin to statistic
+    final_stat($keyword);
+
+    $dbh->fini();
+
+    return 1;
 }
+
+use constant {ROLE_ID=>0, ROLE_NAME=>1, SPEED=>2}; 
+sub fetch_data($$)
+{
+    my ($data_aref, $type) = @_;
+
+    for (my $i = 0; $i <= $#$data_aref; $i++) {
+        my $site = get_site_name($data_aref->[$i]->[ROLE_NAME]);
+        $detail_href->{$site}{$type}{'speed'} = $data_aref->[$i]->[SPEED];
+    }
+}
+
+sub final_stat($)
+{
+    my $keyword = shift;
+    my $cnt_hash = {};
+
+    open my $result_file, '>', "./speed_result.$time_start~$time_end.txt"
+        or die "can't open file : $!";
+
+    my @sorted_sites = sort { $a cmp $b } keys %$detail_href;
+    foreach my $site (@sorted_sites)
+    {
+        if (exists $detail_href->{$site}{ORG} &&
+            exists $detail_href->{$site}{AQB} &&
+            exists $detail_href->{$site}{DNS})
+        {
+            if ($detail_href->{$site}{ORG}{'speed'} == 0 || $detail_href->{$site}{AQB}{'speed'} == 0 ) {
+                next;
+            }
+
+            my $org = $detail_href->{$site}{ORG}{'speed'} + $detail_href->{$site}{DNS}{'speed'};
+            my $aqb = $detail_href->{$site}{AQB}{'speed'};
+
+            my $divby = ($org > $aqb) ? $aqb : $org;
+            my $rate = ($org - $aqb) * 100 / $divby;
+
+            if ($rate > 0) {
+                $cnt_hash->{'above'}++;
+            } else {
+                $cnt_hash->{'below'}++;
+            }
+
+            printf($result_file "%-20s  %.2f\n", $site, $rate);
+            $site_rate_href->{$site} = $rate;
+        }
+    }
+
+    close($result_file);
+
+    say "\e[1;31mresult for $keyword\e[0m";
+    say "above: $cnt_hash->{'above'}";
+    say "below: $cnt_hash->{'below'}";
+}
+
+sub get_site_name($)
+{
+    my $name = shift;
+    return substr($name, 0, (index $name, "_"));
+}
+
+#
+# begin to run
+#
+# analysis bonree cesu data
+sort_db_speed($keyword, $time_start, $time_end);
+
+# calculata speed rate
+speed_rate($time_start);
 
 1;
+
+# vim: ts=8:sw=4:et
 
