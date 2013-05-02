@@ -1,6 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
+use 5.010;
 use Speedy::AQB;
 use Speedy::Utils;
 use Speedy::Http;
@@ -28,9 +29,9 @@ sub speed_rate($)
         'ZIP' => 0,
     );
 
-    open(OUTFD, ">" . $outf);
+    open(OUTFD, ">" . "history_data/" . $outf);
 
-    foreach my $key (sort {$site_rate_href->{$b} <=> $site_rate_href->{$a}} keys %$site_rate_href) 
+    foreach my $key (sort {$site_rate_href->{$a} <=> $site_rate_href->{$b}} keys %$site_rate_href) 
     {
         my @arr = ($site_rate_href->{$key}, $key);
         removeRN(\$arr[1]);
@@ -119,8 +120,10 @@ sub speed_rate($)
     # save to db
     my $dbh = BMD::DBH->new(
         'dbhost' => '116.213.78.228',
-        'dbuser' => 'cesureadonly',
-        'dbpass' => '66ecf9c968132321a02e6e7aff34ce5d',
+        'dbuser' => 'cesutest',
+        'dbpass' => 'cesutest',
+        #'dbuser' => 'cesureadonly',
+        #'dbpass' => '66ecf9c968132321a02e6e7aff34ce5d',
         'dbname' => 'speed',
         'dbport' => 3306
     );
@@ -146,6 +149,7 @@ sub speed_rate_range()
 {
     my $tbegin = "";
     my $tend = "";
+    my $time = "";
     for (my $i=11; $i<=17; $i++) {
         my $j = $i + 1;
         if ($i > 9) {
@@ -178,8 +182,10 @@ sub sort_db_speed(;$$$)
 
     my $dbh = BMD::DBH->new(
         'dbhost' => '116.213.78.228',
-        'dbuser' => 'cesureadonly',
-        'dbpass' => '66ecf9c968132321a02e6e7aff34ce5d',
+        'dbuser' => 'cesutest',
+        'dbpass' => 'cesutest',
+        #'dbuser' => 'cesureadonly',
+        #'dbpass' => '66ecf9c968132321a02e6e7aff34ce5d',
         'dbname' => 'speed',
         'dbport' => 3306
     );
@@ -200,7 +206,7 @@ sub sort_db_speed(;$$$)
 
 
     # debug
-    print Dumper($detail_href);
+    #print Dumper($detail_href);
 
     # begin to statistic
     final_stat($keyword);
@@ -226,22 +232,21 @@ sub final_stat($)
     my $keyword = shift;
     my $cnt_hash = {};
 
-    open my $result_file, '>', "./speed_result.$time_start~$time_end.txt"
-        or die "can't open file : $!";
+    #open my $result_file, '>', "./speed_result.$time_start~$time_end.txt" or die "can't open file : $!";
 
     my @sorted_sites = sort { $a cmp $b } keys %$detail_href;
     foreach my $site (@sorted_sites)
     {
-        if (exists $detail_href->{$site}{ORG} &&
-            exists $detail_href->{$site}{AQB} &&
-            exists $detail_href->{$site}{DNS})
+        if (exists $detail_href->{$site}{&ORG} &&
+            exists $detail_href->{$site}{&AQB} &&
+            exists $detail_href->{$site}{&DNS})
         {
-            if ($detail_href->{$site}{ORG}{'speed'} == 0 || $detail_href->{$site}{AQB}{'speed'} == 0 ) {
+            if ($detail_href->{$site}{&ORG}{'speed'} == 0 || $detail_href->{$site}{&AQB}{'speed'} == 0 ) {
                 next;
             }
 
-            my $org = $detail_href->{$site}{ORG}{'speed'} + $detail_href->{$site}{DNS}{'speed'};
-            my $aqb = $detail_href->{$site}{AQB}{'speed'};
+            my $org = $detail_href->{$site}{&ORG}{'speed'} + $detail_href->{$site}{&DNS}{'speed'};
+            my $aqb = $detail_href->{$site}{&AQB}{'speed'};
 
             my $divby = ($org > $aqb) ? $aqb : $org;
             my $rate = ($org - $aqb) * 100 / $divby;
@@ -252,12 +257,12 @@ sub final_stat($)
                 $cnt_hash->{'below'}++;
             }
 
-            printf($result_file "%-20s  %.2f\n", $site, $rate);
+            #printf($result_file "%-20s  %.2f\n", $site, $rate);
             $site_rate_href->{$site} = $rate;
         }
     }
 
-    close($result_file);
+    #close($result_file);
 
     say "\e[1;31mresult for $keyword\e[0m";
     say "above: $cnt_hash->{'above'}";
