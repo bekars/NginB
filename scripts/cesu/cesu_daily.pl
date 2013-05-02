@@ -9,16 +9,16 @@ use Data::Dumper;
 use BMD::DBH;
 
 my $keyword = "total_time";
-my $time_start = "2013-05-01";
-my $time_end = "2013-05-02";
+my $date = "2013-04-22";
 
 my $site_rate_href = ();
+my $dbh;
 
 # delete config cache=off site from cesu result
 sub speed_rate($)
 {
-    my $time = shift;
-    my $outf = "cesu_" . $time . ".txt";
+    my $date = shift;
+    my $outf = "cesu_" . $date . ".txt";
     my %rate = (
         'TOTAL' => 0,
         'SLOW' => 0,
@@ -33,6 +33,7 @@ sub speed_rate($)
 
     foreach my $key (sort {$site_rate_href->{$a} <=> $site_rate_href->{$b}} keys %$site_rate_href) 
     {
+        # 0 - rate; 1 - site;
         my @arr = ($site_rate_href->{$key}, $key);
         removeRN(\$arr[1]);
 
@@ -83,6 +84,14 @@ sub speed_rate($)
             $rate{ALL_BIGZERO} += 1;
             $rate{ALL_BIGZERO_CNT} += $arr[0];
         }
+    
+        my $sdata = {
+            site => $arr[1],
+            rate => $arr[0],
+            cachehit => 0,
+            time => "$date 00:00:00",
+        };
+        $dbh->insert('site_cesu_daily', $sdata);
     }
 
     $rate{FAST_RATE} = $rate{FAST} * 100 / $rate{TOTAL};
@@ -117,17 +126,6 @@ sub speed_rate($)
     
     close(OUTFD);
 
-    # save to db
-    my $dbh = BMD::DBH->new(
-        'dbhost' => '116.213.78.228',
-        'dbuser' => 'cesutest',
-        'dbpass' => 'cesutest',
-        #'dbuser' => 'cesureadonly',
-        #'dbpass' => '66ecf9c968132321a02e6e7aff34ce5d',
-        'dbname' => 'speed',
-        'dbport' => 3306
-    );
-
     my $data = {
         bigzero => $rate{BIGZ_RATE},
         fast => $rate{FAST_RATE},
@@ -139,10 +137,9 @@ sub speed_rate($)
         all_bigzero => $rate{ALLBIGZ_RATE},
         all_fastavg => $rate{ALLFAST_AVG},
         all_total => $rate{ALL_TOTAL},
-        time => "$time 00:00:00",
+        time => "$date 00:00:00",
     };
     $dbh->insert('cesu_daily', $data);
-    $dbh->fini();
 }
 
 sub speed_rate_range()
@@ -176,32 +173,21 @@ use constant {ORG=>0, AQB=>1, DNS=>2};
 #my $mysql_comm = 'mysql -h116.213.78.228 -ucesureadonly -p66ecf9c968132321a02e6e7aff34ce5d -P3306 -Dspeed -B -N -e ';
 #my $mysql_comm = 'mysql -h59.151.123.74 -ucesu_readonly -p\'Speed@)!@readonly\' -P3307 -Dspeed -B -N -e ';
 my $detail_href = {};
-sub sort_db_speed(;$$$)
+sub sort_db_speed(;$$)
 {
-    my ($keyword, $time_start, $time_end) = @_;
-
-    my $dbh = BMD::DBH->new(
-        'dbhost' => '116.213.78.228',
-        'dbuser' => 'cesutest',
-        'dbpass' => 'cesutest',
-        #'dbuser' => 'cesureadonly',
-        #'dbpass' => '66ecf9c968132321a02e6e7aff34ce5d',
-        'dbname' => 'speed',
-        'dbport' => 3306
-    );
-
+    my ($keyword, $date) = @_;
     my $sql;
 
     # org
-    $sql = qq/select role_id, role_name, round(avg($keyword),4) as a from speed_monitor_data where role_name like "%_ip" and monitor_time > "$time_start" and monitor_time < "$time_end" and total_time != 0 and error_id=0 group by role_id having count(*) > 5 order by a/;
+    $sql = qq/select role_id, role_name, round(avg($keyword),4) as a from speed_monitor_data where role_name like "%_ip" and monitor_time >= "$date 00:00:00" and monitor_time <= "$date 23:59:59" and total_time != 0 and error_id=0 group by role_id having count(*) > 5 order by a/;
     fetch_data($dbh->query($sql), ORG);
 
     # aqb
-    $sql = qq/select role_id, role_name, round(avg($keyword),4) as a from speed_monitor_data where role_name like "%_aqb" and monitor_time > "$time_start" and monitor_time < "$time_end" and total_time != 0 and error_id=0 group by role_id having count(*) > 5 order by a/;
+    $sql = qq/select role_id, role_name, round(avg($keyword),4) as a from speed_monitor_data where role_name like "%_aqb" and monitor_time >= "$date 00:00:00" and monitor_time <= "$date 23:59:59" and total_time != 0 and error_id=0 group by role_id having count(*) > 5 order by a/;
     fetch_data($dbh->query($sql), AQB);
 
     # dns
-    $sql = qq/select role_id, role_name, round(avg(dns_time),4) as a from speed_monitor_data where role_name like "%_aqb" and monitor_time > "$time_start" and monitor_time < "$time_end" and total_time != 0 and error_id=0 group by role_id having count(*) > 5 order by a/;
+    $sql = qq/select role_id, role_name, round(avg(dns_time),4) as a from speed_monitor_data where role_name like "%_aqb" and monitor_time > "$date 00:00:00" and monitor_time <= "$date 23:59:59" and total_time != 0 and error_id=0 group by role_id having count(*) > 5 order by a/;
     fetch_data($dbh->query($sql), DNS);
 
 
@@ -210,8 +196,6 @@ sub sort_db_speed(;$$$)
 
     # begin to statistic
     final_stat($keyword);
-
-    $dbh->fini();
 
     return 1;
 }
@@ -232,7 +216,7 @@ sub final_stat($)
     my $keyword = shift;
     my $cnt_hash = {};
 
-    #open my $result_file, '>', "./speed_result.$time_start~$time_end.txt" or die "can't open file : $!";
+    #open my $result_file, '>', "./speed_result.$date.txt" or die "can't open file : $!";
 
     my @sorted_sites = sort { $a cmp $b } keys %$detail_href;
     foreach my $site (@sorted_sites)
@@ -278,13 +262,25 @@ sub get_site_name($)
 #
 # begin to run
 #
+$dbh = BMD::DBH->new(
+    'dbhost' => '116.213.78.228',
+    'dbuser' => 'cesutest',
+    'dbpass' => 'cesutest',
+    #'dbuser' => 'cesureadonly',
+    #'dbpass' => '66ecf9c968132321a02e6e7aff34ce5d',
+    'dbname' => 'speed',
+    'dbport' => 3306
+);
+
 # analysis bonree cesu data
-sort_db_speed($keyword, $time_start, $time_end);
+sort_db_speed($keyword, $date);
 
 # calculata speed rate
-speed_rate($time_start);
+speed_rate($date);
+
+$dbh->fini();
 
 1;
 
-# vim: ts=8:sw=4:et
+# vim: ts=4:sw=4:et
 
