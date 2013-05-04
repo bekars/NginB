@@ -9,10 +9,11 @@ use Data::Dumper;
 use BMD::DBH;
 
 my $keyword = "total_time";
-my $date = "2013-04-22";
+my $date = "2013-05-03";
 
 my $site_rate_href = ();
 my $dbh;
+my $do_db = 1;
 
 # delete config cache=off site from cesu result
 sub speed_rate($)
@@ -35,6 +36,7 @@ sub speed_rate($)
     {
         # 0 - rate; 1 - site;
         my @arr = ($site_rate_href->{$key}, $key);
+        $arr[0] = roundFloat($arr[0]);
         removeRN(\$arr[1]);
 
         my $site = getSiteInfo($arr[1]);
@@ -62,11 +64,11 @@ sub speed_rate($)
                     $rate{LESSZERO_CNT} += $arr[0];
                 }
            } else {
-               printf("### OUT site: %s\n", $arr[1]);
+               #printf("### OUT site: %s\n", $arr[1]);
            }
 
         } else {
-            printf("### Cache Off: %s\n", $arr[1]);
+            #printf("### Cache Off: %s\n", $arr[1]);
         }
 
 #=pod
@@ -91,7 +93,7 @@ sub speed_rate($)
             cachehit => 0,
             time => "$date 00:00:00",
         };
-        $dbh->insert('site_cesu_daily', $sdata);
+        $dbh->insert('site_cesu_daily', $sdata) if $do_db;
     }
 
     $rate{FAST_RATE} = $rate{FAST} * 100 / $rate{TOTAL};
@@ -139,7 +141,7 @@ sub speed_rate($)
         all_total => $rate{ALL_TOTAL},
         time => "$date 00:00:00",
     };
-    $dbh->insert('cesu_daily', $data);
+    $dbh->insert('cesu_daily', $data) if $do_db;
 }
 
 sub speed_rate_range()
@@ -177,19 +179,22 @@ sub sort_db_speed(;$$)
 {
     my ($keyword, $date) = @_;
     my $sql;
+    my $city_sql = "";
 
     # org
-    $sql = qq/select role_id, role_name, round(avg($keyword),4) as a from speed_monitor_data where role_name like "%_ip" and monitor_time >= "$date 00:00:00" and monitor_time <= "$date 23:59:59" and total_time != 0 and error_id=0 group by role_id having count(*) > 5 order by a/;
+    $sql = qq/select role_id, role_name, round(avg($keyword),4) as a from speed_monitor_data where role_name like "%_ip" and monitor_time >= "$date 00:00:00" and monitor_time <= "$date 23:59:59" and total_time != 0 and error_id=0 and role_ip!="0.0.0.0" $city_sql group by role_id having count(*) > 5 order by a/;
+    printf("%s\n", $sql);
     fetch_data($dbh->query($sql), ORG);
 
     # aqb
-    $sql = qq/select role_id, role_name, round(avg($keyword),4) as a from speed_monitor_data where role_name like "%_aqb" and monitor_time >= "$date 00:00:00" and monitor_time <= "$date 23:59:59" and total_time != 0 and error_id=0 group by role_id having count(*) > 5 order by a/;
+    $sql = qq/select role_id, role_name, round(avg($keyword),4) as a from speed_monitor_data where role_name like "%_aqb" and monitor_time >= "$date 00:00:00" and monitor_time <= "$date 23:59:59" and total_time != 0 and error_id=0 and role_ip!="0.0.0.0" $city_sql group by role_id having count(*) > 5 order by a/;
+    printf("%s\n", $sql);
     fetch_data($dbh->query($sql), AQB);
 
     # dns
-    $sql = qq/select role_id, role_name, round(avg(dns_time),4) as a from speed_monitor_data where role_name like "%_aqb" and monitor_time > "$date 00:00:00" and monitor_time <= "$date 23:59:59" and total_time != 0 and error_id=0 group by role_id having count(*) > 5 order by a/;
+    $sql = qq/select role_id, role_name, round(avg(dns_time),4) as a from speed_monitor_data where role_name like "%_aqb" and monitor_time > "$date 00:00:00" and monitor_time <= "$date 23:59:59" and total_time != 0 and error_id=0 and role_ip!="0.0.0.0" $city_sql group by role_id having count(*) > 5 order by a/;
+    printf("%s\n", $sql);
     fetch_data($dbh->query($sql), DNS);
-
 
     # debug
     #print Dumper($detail_href);
