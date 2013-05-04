@@ -10,7 +10,7 @@ use BMD::DBH;
 use Time::Interval;
 
 my $keyword = "total_time";
-my $date = "2013-04-27";
+my $date = "2013-05-03";
 
 my $site_rate_href = ();
 my $dbh;
@@ -438,6 +438,72 @@ sub generate_speed_analysis($)
 }
 
 
+use constant {
+    COM_IPSEG      => 0,
+    COM_TOTAL_RATE => 1,
+    COM_COUNT      => 2,
+};
+
+sub compare_cluster($$)
+{
+    my ($base_date, $comp_date) = @_;
+    my $sql;
+    my $comp_href;
+
+    $sql = qq/select fun_ipseg(aqb_ip) as a, round(avg(total_rate),2), count(*) as c from speed_data_analysis where time like "$base_date %" and total_rate!=0 group by fun_ipseg(aqb_ip) order by c desc/;
+    my $base_aref = $dbh->query($sql);
+    
+    $sql = qq/select fun_ipseg(aqb_ip) as a, round(avg(total_rate),2), count(*) as c from speed_data_analysis where time like "$comp_date %" and total_rate!=0 group by fun_ipseg(aqb_ip) order by c desc/;
+    my $comp_aref = $dbh->query($sql);
+
+    for (my $i = 0; $i <= $#$base_aref; $i++) {
+        for (my $j = 0; $j <= $#$comp_aref; $j++) {
+            if ($base_aref->[$i][COM_IPSEG] eq $comp_aref->[$j][COM_IPSEG]) {
+                $comp_href->{$base_aref->[$i][COM_IPSEG]}{rate} = $comp_aref->[$j][COM_TOTAL_RATE] - $base_aref->[$i][COM_TOTAL_RATE];
+                $comp_href->{$base_aref->[$i][COM_IPSEG]}{count} = $comp_aref->[$j][COM_COUNT] + $base_aref->[$i][COM_COUNT];
+            }
+        }
+    }
+
+    foreach my $k (sort {$comp_href->{$a}{rate} <=> $comp_href->{$b}{rate}} keys %$comp_href) {
+        printf("%s.X\t%0.2f\t%d\n", $k, $comp_href->{$k}{rate}, $comp_href->{$k}{count});
+    }
+    
+    for (my $i = 0; $i <= $#$base_aref; $i++) {
+        my $findit = 0;
+        foreach my $k (keys %$comp_href) {
+            if ($base_aref->[$i][COM_IPSEG] eq $k) {
+                $findit = 1;
+                last;
+            }
+        }
+
+        if (!$findit) {
+            printf("- %s.X\t%0.2f\t%d\n", $base_aref->[$i][COM_IPSEG],
+                $base_aref->[$i][COM_TOTAL_RATE],
+                $base_aref->[$i][COM_COUNT]);
+        }
+    }
+
+    for (my $i = 0; $i <= $#$comp_aref; $i++) {
+        my $findit = 0;
+        foreach my $k (keys %$comp_href) {
+            if ($comp_aref->[$i][COM_IPSEG] eq $k) {
+                $findit = 1;
+                last;
+            }
+        }
+
+        if (!$findit) {
+            printf("+ %s.X\t%0.2f\t%d\n", $comp_aref->[$i][COM_IPSEG],
+                $comp_aref->[$i][COM_TOTAL_RATE],
+                $comp_aref->[$i][COM_COUNT]);
+        }
+    }
+
+    return $comp_href;
+}
+
 #
 # begin to run
 #
@@ -451,7 +517,11 @@ $dbh = BMD::DBH->new(
     'dbport' => 3306
 );
 
-generate_speed_analysis($date);
+#generate_speed_analysis($date);
+
+#compare_cluster("2013-04-22", "2013-04-27");
+#compare_cluster("2013-05-01", "2013-05-02");
+compare_cluster("2013-05-01", "2013-05-03");
 
 # analysis bonree cesu data
 #sort_db_speed($keyword, $date);
