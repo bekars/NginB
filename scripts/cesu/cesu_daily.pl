@@ -9,7 +9,7 @@ use Data::Dumper;
 use BMD::DBH;
 
 my $keyword = "total_time";
-my $date = "2013-05-03";
+my $date = `date -d "last day" +"%Y-%m-%d"`;#"2013-05-05";
 
 my $site_rate_href = ();
 my $dbh;
@@ -63,7 +63,15 @@ sub speed_rate($)
                     $rate{LESSZERO} += 1;
                     $rate{LESSZERO_CNT} += $arr[0];
                 }
-           } else {
+
+                my $sdata = {
+                    site => $arr[1],
+                    rate => $arr[0],
+                    cachehit => 0,
+                    time => "$date 00:00:00",
+                };
+                $dbh->insert('site_cesu_daily', $sdata) if $do_db;
+            } else {
                #printf("### OUT site: %s\n", $arr[1]);
            }
 
@@ -86,14 +94,6 @@ sub speed_rate($)
             $rate{ALL_BIGZERO} += 1;
             $rate{ALL_BIGZERO_CNT} += $arr[0];
         }
-    
-        my $sdata = {
-            site => $arr[1],
-            rate => $arr[0],
-            cachehit => 0,
-            time => "$date 00:00:00",
-        };
-        $dbh->insert('site_cesu_daily', $sdata) if $do_db;
     }
 
     $rate{FAST_RATE} = $rate{FAST} * 100 / $rate{TOTAL};

@@ -10,7 +10,7 @@ use BMD::DBH;
 use Time::Interval;
 
 my $keyword = "total_time";
-my $date = "2013-05-03";
+my $date = "2013-05-05";
 
 my $dbh;
 my $do_db = 1;
@@ -178,6 +178,7 @@ use constant {
     COM_IPSEG      => 0,
     COM_TOTAL_RATE => 1,
     COM_COUNT      => 2,
+    COM_PERCENT    => 3,
 };
 
 sub cluster_cesu_hour($$$)
@@ -195,11 +196,12 @@ sub cluster_cesu_hour($$$)
             $cl_hour_href->{dailyid} = $id;
             $cl_hour_href->{clock} = "$key_clock:00:00";
             $cl_hour_href->{ipseg} = $cl_href->{ipseg};
-            $cl_hour_href->{total_rate} = $recs->[0][COM_TOTAL_RATE];
+            $cl_hour_href->{total_rate} = 0;
+            $cl_hour_href->{total_rate} = $recs->[0][COM_TOTAL_RATE] if $recs->[0][COM_TOTAL_RATE];
             $cl_hour_href->{count} = $recs->[0][COM_COUNT];
             $cl_hour_href->{time} = "$date";
 
-            $dbh->insert("cluster_cesu_hour", $cl_hour_href);
+            $dbh->insert("cluster_cesu_hour", $cl_hour_href) if $do_db;
         }
     }
 }
@@ -210,6 +212,9 @@ sub cluster_cesu_daily($)
     my $sql = "";
     my $cluster_href = ();
     
+    $sql = qq/select count(*) as c from speed_data_analysis where time like "$date %" and total_rate!=0/;
+    my $total_cnt = $dbh->query_count($sql);
+
     $sql = qq/select fun_ipseg(aqb_ip) as a, round(avg(total_rate),2), count(*) as c from speed_data_analysis where time like "$date %" and total_rate!=0 group by fun_ipseg(aqb_ip) order by c desc/;
     my $recs = $dbh->query($sql);
     for (my $i = 0; $i <= $#$recs; $i++) {
@@ -217,12 +222,13 @@ sub cluster_cesu_daily($)
         $cluster_href->{ipseg} = $recs->[$i][COM_IPSEG];
         $cluster_href->{total_rate} = $recs->[$i][COM_TOTAL_RATE];
         $cluster_href->{count} = $recs->[$i][COM_COUNT];
+        $cluster_href->{percent} = roundFloat($recs->[$i][COM_COUNT] * 100 / $total_cnt);
         $cluster_href->{time} = "$date";
 
-        $dbh->insert("cluster_cesu_daily", $cluster_href);
+        $dbh->insert("cluster_cesu_daily", $cluster_href) if $do_db;
 
         # if speed rate too bad, need to analysis hours data
-        if (($cluster_href->{count} > 200) && ($cluster_href->{total_rate} <= 0)) {
+        if ($cluster_href->{count} > 10) { # || ($cluster_href->{total_rate} <= 0))) {
             $sql = qq/select id from cluster_cesu_daily where ipseg="$cluster_href->{ipseg}" and time like "$date %"/;
             my $id = $dbh->query($sql);
             if (exists($id->[0][0])) {
@@ -240,10 +246,10 @@ sub compare_cluster($$)
     my $sql;
     my $comp_href;
 
-    $sql = qq/select fun_ipseg(aqb_ip) as a, round(avg(total_rate),2), count(*) as c from speed_data_analysis where time like "$base_date %" and total_rate!=0 group by fun_ipseg(aqb_ip) order by c desc/;
+    $sql = qq/select ipseg, total_rate, count, percent from cluster_cesu_daily where time like "$base_date %" order by percent desc/;
     my $base_aref = $dbh->query($sql);
     
-    $sql = qq/select fun_ipseg(aqb_ip) as a, round(avg(total_rate),2), count(*) as c from speed_data_analysis where time like "$comp_date %" and total_rate!=0 group by fun_ipseg(aqb_ip) order by c desc/;
+    $sql = qq/select ipseg, total_rate, count, percent from cluster_cesu_daily where time like "$comp_date %" order by percent desc/;
     my $comp_aref = $dbh->query($sql);
 
     for (my $i = 0; $i <= $#$base_aref; $i++) {
@@ -251,12 +257,23 @@ sub compare_cluster($$)
             if ($base_aref->[$i][COM_IPSEG] eq $comp_aref->[$j][COM_IPSEG]) {
                 $comp_href->{$base_aref->[$i][COM_IPSEG]}{rate} = $comp_aref->[$j][COM_TOTAL_RATE] - $base_aref->[$i][COM_TOTAL_RATE];
                 $comp_href->{$base_aref->[$i][COM_IPSEG]}{count} = $comp_aref->[$j][COM_COUNT] + $base_aref->[$i][COM_COUNT];
+                $comp_href->{$base_aref->[$i][COM_IPSEG]}{percent} = ($comp_aref->[$j][COM_PERCENT] + $base_aref->[$i][COM_PERCENT]) / 2;
+                $comp_href->{$base_aref->[$i][COM_IPSEG]}{old_rate} = $base_aref->[$i][COM_TOTAL_RATE];
+                $comp_href->{$base_aref->[$i][COM_IPSEG]}{now_rate} = $comp_aref->[$j][COM_TOTAL_RATE];
+                $comp_href->{$base_aref->[$i][COM_IPSEG]}{old_percent} = $base_aref->[$i][COM_PERCENT];
+                $comp_href->{$base_aref->[$i][COM_IPSEG]}{now_percent} = $comp_aref->[$j][COM_PERCENT];
+                $comp_href->{$base_aref->[$i][COM_IPSEG]}{effect} = $comp_href->{$base_aref->[$i][COM_IPSEG]}{rate} * $comp_href->{$base_aref->[$i][COM_IPSEG]}{percent} / 100;
             }
         }
     }
 
     foreach my $k (sort {$comp_href->{$a}{rate} <=> $comp_href->{$b}{rate}} keys %$comp_href) {
-        printf("%s.X\t%0.2f\t%d\n", $k, $comp_href->{$k}{rate}, $comp_href->{$k}{count});
+        printf("%11s.X\t%.2f\t%.2f\t%.2f\t\t%.2f\t%.2f\t%.2f\t%.2f\n", $k, 
+            $comp_href->{$k}{rate}, $comp_href->{$k}{percent}, 
+            $comp_href->{$k}{effect},
+            $comp_href->{$k}{old_rate}, $comp_href->{$k}{now_rate}, 
+            $comp_href->{$k}{old_percent}, $comp_href->{$k}{now_percent}, 
+        );
     }
     
     for (my $i = 0; $i <= $#$base_aref; $i++) {
@@ -269,9 +286,9 @@ sub compare_cluster($$)
         }
 
         if (!$findit) {
-            printf("- %s.X\t%0.2f\t%d\n", $base_aref->[$i][COM_IPSEG],
+            printf("- %11s.X\t%.2f\t%.2f\n", $base_aref->[$i][COM_IPSEG],
                 $base_aref->[$i][COM_TOTAL_RATE],
-                $base_aref->[$i][COM_COUNT]);
+                $base_aref->[$i][COM_PERCENT]);
         }
     }
 
@@ -285,14 +302,33 @@ sub compare_cluster($$)
         }
 
         if (!$findit) {
-            printf("+ %s.X\t%0.2f\t%d\n", $comp_aref->[$i][COM_IPSEG],
+            printf("+ %11s.X\t%.2f\t%.2f\n", $comp_aref->[$i][COM_IPSEG],
                 $comp_aref->[$i][COM_TOTAL_RATE],
-                $comp_aref->[$i][COM_COUNT]);
+                $comp_aref->[$i][COM_PERCENT]);
         }
     }
 
     return $comp_href;
 }
+
+sub delta_daily($$)
+{
+    my ($date_start, $date_end) = @_;
+
+    my $sql = qq/select distince(ipseg) from cluster_cesu_daily where time>="$date_start 00:00:00" and time<="$date_end 00:00:00"/;
+    my $ipseg_aref = $dbh->query($sql);
+
+    for (my $i = 0; $i <= $#$ipseg_aref; $i++) {
+        say($ipseg_aref->[$i]);
+
+        $sql = qq/select total_rate from cluster_cesu_daily where time>="$date_start 00:00:00" and time<="$date_end 00:00:00"/;
+
+    }
+
+    return 1;
+}
+
+
 
 #
 # begin to run
@@ -309,11 +345,11 @@ $dbh = BMD::DBH->new(
 
 #speed_data_analysis($date);
 
-cluster_cesu_daily($date);
+#cluster_cesu_daily($date);
 
-#compare_cluster("2013-04-22", "2013-05-05");
+#compare_cluster("2013-04-22", "2013-05-02");
 #compare_cluster("2013-05-01", "2013-05-02");
-#compare_cluster("2013-05-03", "2013-05-04");
+compare_cluster("2013-05-05", "2013-05-06");
 
 $dbh->fini();
 
