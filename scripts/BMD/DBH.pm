@@ -29,11 +29,9 @@ sub new()
     return $self;
 }
 
-sub query($)
+sub _query($)
 {
-    my $self = shift;
     my $sql = shift;
-
     my $data_ref = ();
     my @row;
     if (!defined($sql)) {
@@ -41,7 +39,7 @@ sub query($)
     }
 
     #printf("RUNSQL: %s\n", $sql);
-    my $sth = $self->{dbh}->prepare($sql);
+    my $sth = $dbh->prepare($sql);
     $sth->execute() or printf("SQL err: [$sql]" . "(" . length($sql) .")" . $sth->errstr);
     while (@row = $sth->fetchrow_array) {
         my @recs = @row;
@@ -50,6 +48,20 @@ sub query($)
     $sth->finish();
 
     return $data_ref;
+}
+
+sub query($)
+{
+    my $self = shift;
+    my $sql = shift;
+    return _query($sql);
+}
+
+sub query_count($)
+{
+    my $self = shift;
+    my $sql = shift;
+    return _query($sql)->[0][0];
 }
 
 sub _dosql($)
