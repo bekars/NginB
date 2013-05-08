@@ -11,6 +11,7 @@ CREATE TABLE `cesu_daily` (
   `all_fastavg` float NOT NULL DEFAULT '0',
   `all_total` int(10) NOT NULL DEFAULT '0',
   `time` datetime NOT NULL,
+  `city` varchar(32) NOT NULL DEFAULT 'all',
   PRIMARY KEY (`id`),
   KEY `index_time` (`time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -55,5 +56,56 @@ CREATE TABLE `site_pv_info` (
   KEY `index_record_id` (`site`(255)),
   KEY `index_time` (`time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE `speed_data_analysis` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `role_id` bigint(20) NOT NULL,
+  `role_name` varchar(500) NOT NULL,
+  `total_rate` float NOT NULL DEFAULT '0',
+  `tcp_rate` float NOT NULL DEFAULT '0',
+  `response_rate` float NOT NULL DEFAULT '0',
+  `download_rate` float NOT NULL DEFAULT '0',
+  `aqb_ip` varchar(32) NOT NULL,
+  `org_ip` varchar(32) NOT NULL,
+  `city_code` int(11) NOT NULL,
+  `time_interval` int(10) NOT NULL DEFAULT 0,
+  `time` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `index_city` (`city_code`),
+  KEY `index_time` (`time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+CREATE function fun_ipseg(ipaddr varchar(32))
+returns varchar(32)
+begin
+    declare ip_seg varchar(32);
+    set ip_seg = substring_index(ipaddr, ".", 3);
+    return ip_seg;
+end
+
+CREATE TABLE `cluster_cesu_daily` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `ipseg` varchar(500) NOT NULL,
+  `total_rate` float NOT NULL DEFAULT '0',
+  `count` int(10) NOT NULL DEFAULT '0',
+  `percent` float NOT NULL DEFAULT '0',
+  `time` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `index_time` (`time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE `cluster_cesu_hour` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `dailyid` bigint(20) unsigned NOT NULL,
+  `clock` time NOT NULL,
+  `ipseg` varchar(500) NOT NULL,
+  `total_rate` float NOT NULL DEFAULT '0',
+  `count` int(10) NOT NULL DEFAULT '0',
+  `time` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `index_time` (`time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
 
 

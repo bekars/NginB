@@ -10,10 +10,12 @@ use BMD::DBH;
 use Time::Interval;
 
 my $keyword = "total_time";
-my $date = "2013-05-05";
+my $date = "2013-04-27";
 
 my $dbh;
 my $do_db = 1;
+
+my $analysis_fp;
 
 my $city_code = {
     1100201 => "shanghai",
@@ -94,6 +96,11 @@ sub vs_rate($$$$$)
     $intersec = $intersec * (-1) if ($aqb->{&ANA_MONITOR_TIME} lt $org->{&ANA_MONITOR_TIME});
     $vs_href->{all}{time_interval} = $intersec;
 
+    # abnormal data return null
+    if (($vs_href->{all}{total_rate}) > 300 || ($vs_href->{all}{total_rate} < -300)) {
+        return;
+    }
+
     return $vs_href;
 }
 
@@ -158,10 +165,10 @@ sub speed_data_analysis($)
                     (0==$vs_data->{aqb}{&ANA_ERR_ID}) && (0==$vs_data->{org}{&ANA_ERR_ID})) 
                 {
                     $vs_data->{org}{&ANA_TOTAL_TIME} += $vs_data->{aqb}{&ANA_DNS_TIME} if $vs_data->{org}{&ANA_TOTAL_TIME}>0;
-                    vs_rate($date, $site, $key_city, $key_clock, $vs_data);
-
-                    # save to db
-                    $dbh->insert('speed_data_analysis', $vs_data->{all}) if $do_db;
+                    if (vs_rate($date, $site, $key_city, $key_clock, $vs_data)) {
+                        # save to db
+                        $dbh->insert('speed_data_analysis', $vs_data->{all}) if $do_db;
+                    }
                     printf(Dumper($vs_data));
                     printf("#############################\n");
                 }
@@ -268,12 +275,59 @@ sub compare_cluster($$)
     }
 
     foreach my $k (sort {$comp_href->{$a}{rate} <=> $comp_href->{$b}{rate}} keys %$comp_href) {
-        printf("%11s.X\t%.2f\t%.2f\t%.2f\t\t%.2f\t%.2f\t%.2f\t%.2f\n", $k, 
+        printf("%11s.X\t%.2f\t%.2f%%\t%.2f%%\t\t%.2f%%\t%.2f%%\t%.2f%%\t%.2f%%\n", $k, 
             $comp_href->{$k}{rate}, $comp_href->{$k}{percent}, 
             $comp_href->{$k}{effect},
             $comp_href->{$k}{old_rate}, $comp_href->{$k}{now_rate}, 
             $comp_href->{$k}{old_percent}, $comp_href->{$k}{now_percent}, 
         );
+
+        my $flag = 0;
+        if ($comp_href->{$k}{effect} < -0.5) {
+            printf($analysis_fp "减    速: ");
+            $flag = 1;
+        } elsif ($comp_href->{$k}{effect} > 0.5) {
+            printf($analysis_fp "加    速: ");
+            $flag = 1;
+        }
+
+        if ($flag) {
+            printf($analysis_fp "%11s.X\t%.2f\t%.2f%%\t\t%.2f%%\t%.2f%%\t%.2f%%\t%.2f%%\n", 
+                $k, 
+                $comp_href->{$k}{rate}, $comp_href->{$k}{percent}, 
+                $comp_href->{$k}{old_rate}, $comp_href->{$k}{now_rate}, 
+                $comp_href->{$k}{old_percent}, $comp_href->{$k}{now_percent}, 
+            );
+        }
+
+        next if ($flag);
+
+        my $delta_percent = $comp_href->{$k}{now_percent} - $comp_href->{$k}{old_percent};
+        if ($delta_percent > 2 && $comp_href->{$k}{now_rate} > 0) {
+            printf($analysis_fp "调入加速: ");
+            printf($analysis_fp "%11s.X\t%.2f%%\t%.2f%%\n", $k,
+                $comp_href->{$k}{now_rate},
+                $comp_href->{$k}{now_percent} - $comp_href->{$k}{old_percent}
+            );
+        } elsif ($delta_percent > 2 && $comp_href->{$k}{now_rate} < 0) {
+            printf($analysis_fp "调入减速: ");
+            printf($analysis_fp "%11s.X\t%.2f%%\t%.2f%%\n", $k,
+                $comp_href->{$k}{now_rate},
+                $comp_href->{$k}{now_percent} - $comp_href->{$k}{old_percent}
+            );
+        } elsif ($delta_percent < -2 && $comp_href->{$k}{now_rate} < 0) {
+            printf($analysis_fp "调出加速: ");
+            printf($analysis_fp "%11s.X\t%.2f%%\t%.2f%%\n", $k,
+                $comp_href->{$k}{old_rate},
+                $comp_href->{$k}{old_percent} - $comp_href->{$k}{new_percent}
+            );
+        } elsif ($delta_percent < -2 && $comp_href->{$k}{now_rate} > 0) {
+            printf($analysis_fp "调出减速: ");
+            printf($analysis_fp "%11s.X\t%.2f%%\t%.2f%%\n", $k,
+                $comp_href->{$k}{old_rate},
+                $comp_href->{$k}{old_percent} - $comp_href->{$k}{new_percent}
+            );
+        }
     }
     
     for (my $i = 0; $i <= $#$base_aref; $i++) {
@@ -286,9 +340,24 @@ sub compare_cluster($$)
         }
 
         if (!$findit) {
-            printf("- %11s.X\t%.2f\t%.2f\n", $base_aref->[$i][COM_IPSEG],
+            my $effect = $base_aref->[$i][COM_TOTAL_RATE] * $base_aref->[$i][COM_PERCENT] / 100;
+            printf("- %11s.X\t%.2f%%\t%.2f%%\t%.2f%%\n", $base_aref->[$i][COM_IPSEG],
                 $base_aref->[$i][COM_TOTAL_RATE],
-                $base_aref->[$i][COM_PERCENT]);
+                $base_aref->[$i][COM_PERCENT],
+                $effect
+            );
+
+            if ($effect > 1 || $effect < -1) {
+                if ($base_aref->[$i][COM_TOTAL_RATE] > 0) {
+                    printf($analysis_fp "调出减速: ");
+                } else {
+                    printf($analysis_fp "调出加速: ");
+                }
+                printf($analysis_fp "%11s.X\t%.2f%%\t%.2f%%\n", $base_aref->[$i][COM_IPSEG],
+                    $base_aref->[$i][COM_TOTAL_RATE],
+                    $base_aref->[$i][COM_PERCENT],
+                );
+            }
         }
     }
 
@@ -302,9 +371,24 @@ sub compare_cluster($$)
         }
 
         if (!$findit) {
-            printf("+ %11s.X\t%.2f\t%.2f\n", $comp_aref->[$i][COM_IPSEG],
+            my $effect = $comp_aref->[$i][COM_TOTAL_RATE] * $comp_aref->[$i][COM_PERCENT] / 100;
+            printf("+ %11s.X\t%.2f%%\t%.2f%%\t%.2f%%\n", $comp_aref->[$i][COM_IPSEG],
                 $comp_aref->[$i][COM_TOTAL_RATE],
-                $comp_aref->[$i][COM_PERCENT]);
+                $comp_aref->[$i][COM_PERCENT],
+                $effect
+            );
+            
+            if ($effect > 1 || $effect < -1) {
+                if ($comp_aref->[$i][COM_TOTAL_RATE] > 0) {
+                    printf($analysis_fp "调入加速: ");
+                } else {
+                    printf($analysis_fp "调入减速: ");
+                }
+                printf($analysis_fp "%11s.X\t%.2f%%\t%.2f%%\n", $comp_aref->[$i][COM_IPSEG],
+                    $comp_aref->[$i][COM_TOTAL_RATE],
+                    $comp_aref->[$i][COM_PERCENT],
+                );
+            }
         }
     }
 
@@ -328,6 +412,34 @@ sub delta_daily($$)
     return 1;
 }
 
+my @cluster_out = (
+    '64.32.4', 
+    '69.28.51', 
+    '210.209.122', 
+    '61.244.110', 
+    '120.50.35', 
+    '54.248.83', 
+);
+
+sub cluster_slow_daily($)
+{
+    my $date = shift;
+    my $sql = qq/select ipseg,total_rate,count,percent from cluster_cesu_daily where time like "$date %" and percent>0.5 and total_rate<-10 order by total_rate/;
+
+    my $recs = $dbh->query($sql);
+    LOOP: for (my $i = 0; $i <= $#$recs; $i++) {
+        foreach my $out (@cluster_out) {
+            next LOOP if ($out eq $recs->[$i][COM_IPSEG]);
+        }
+
+        printf($analysis_fp "ipseg: %s\trate: %.2f\tcount: %d\tpercent: %.2f\n",
+            $recs->[$i][COM_IPSEG],
+            $recs->[$i][COM_TOTAL_RATE],
+            $recs->[$i][COM_COUNT],
+            $recs->[$i][COM_PERCENT],
+        );
+    }
+}
 
 
 #
@@ -347,10 +459,14 @@ $dbh = BMD::DBH->new(
 
 #cluster_cesu_daily($date);
 
-#compare_cluster("2013-04-22", "2013-05-02");
+open($analysis_fp, ">/tmp/analysis_daily.txt");
+
+#compare_cluster("2013-04-22", "2013-04-27");
 #compare_cluster("2013-05-01", "2013-05-02");
 compare_cluster("2013-05-05", "2013-05-06");
 
+cluster_slow_daily("2013-05-06");
+close($analysis_fp);
 $dbh->fini();
 
 1;
