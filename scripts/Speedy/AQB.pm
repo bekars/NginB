@@ -76,7 +76,7 @@ sub runSQL($)
 
     #printf("RUNSQL: $sql\n");
     my $sth = $dbh->prepare($sql);
-    $sth->execute() or die("SQL err: [$sql]" . "(" . length($sql) .")" . $sth->errstr);
+    $sth->execute() or printf("SQL err: [$sql]" . "(" . length($sql) .")" . $sth->errstr);
     while (@row = $sth->fetchrow_array) {
         my @recs = @row;
         push(@rec_a, \@recs);

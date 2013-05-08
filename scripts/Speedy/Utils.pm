@@ -117,6 +117,11 @@ sub daemonize()
     umask 0;
 }
 
+sub isnumeric($)
+{
+    my $val = shift;
+    ($val ^ $val) eq '0';
+}
 
 1;
 

@@ -30,6 +30,9 @@ my $site_result = "%s/cache_site_%s.result";
 my $domain_flag = "";
 my %cachehit_site_h = ();
 
+my $miss_result = "%s/miss_%s.result";
+my $miss_fp;
+
 sub cache_expired_analysis
 {
     my $node_h = shift;
@@ -73,6 +76,9 @@ sub cachehit_analysis_init($)
 
     $log_result = sprintf($log_result, $mod_h->{dir}, $mod_h->{date});
     $site_result = sprintf($site_result, $mod_h->{dir}, $mod_h->{date});
+
+    $miss_result = sprintf($miss_result, $mod_h->{dir}, $mod_h->{date});
+    open($miss_fp, ">$miss_result");
 }
 
 sub cachehit_site
@@ -108,6 +114,10 @@ sub cachehit_analysis_mod($)
     if ($node_h->{cache_status} eq "") {
         $node_h->{cache_status} = "NULL";
     }
+
+    if ($node_h->{agent} =~ m/aqb_prefetch/) {
+        return;
+    }
     
     $cache_hit_h{$node_h->{cache_status}} += 1;
     $cache_hit_h{TOTAL} += 1;
@@ -117,6 +127,14 @@ sub cachehit_analysis_mod($)
     $cache_http_status_h{TOTAL} += 1;
     $cache_http_status_h{"$node_h->{http_status}" . "_FLOW"} += $node_h->{http_len};
     $cache_http_status_h{TOTAL_FLOW} += $node_h->{http_len};
+
+    # record miss log
+    if ($node_h->{cache_status} eq "MISS") {
+        my $log = $node_h->{log};
+        $log =~ tr/%/#/;
+        $log =~ tr/\n//d;
+        printf($miss_fp "$log  $node_h->{domain}\n");
+    }
 
     cache_expired_analysis($node_h);
 
