@@ -10,7 +10,9 @@ use BMD::DBH;
 use Time::Interval;
 
 my $keyword = "total_time";
-my $date = "2013-04-27";
+
+my $yesterday = "2013-05-07";
+my $today     = "2013-05-08";
 
 my $dbh;
 my $do_db = 1;
@@ -282,52 +284,14 @@ sub compare_cluster($$)
             $comp_href->{$k}{old_percent}, $comp_href->{$k}{now_percent}, 
         );
 
-        my $flag = 0;
-        if ($comp_href->{$k}{effect} < -0.5) {
-            printf($analysis_fp "减    速: ");
-            $flag = 1;
-        } elsif ($comp_href->{$k}{effect} > 0.5) {
-            printf($analysis_fp "加    速: ");
-            $flag = 1;
-        }
-
-        if ($flag) {
-            printf($analysis_fp "%11s.X\t%.2f\t%.2f%%\t\t%.2f%%\t%.2f%%\t%.2f%%\t%.2f%%\n", 
-                $k, 
-                $comp_href->{$k}{rate}, $comp_href->{$k}{percent}, 
-                $comp_href->{$k}{old_rate}, $comp_href->{$k}{now_rate}, 
-                $comp_href->{$k}{old_percent}, $comp_href->{$k}{now_percent}, 
-            );
-        }
-
-        next if ($flag);
-
-        my $delta_percent = $comp_href->{$k}{now_percent} - $comp_href->{$k}{old_percent};
-        if ($delta_percent > 2 && $comp_href->{$k}{now_rate} > 0) {
-            printf($analysis_fp "调入加速: ");
-            printf($analysis_fp "%11s.X\t%.2f%%\t%.2f%%\n", $k,
-                $comp_href->{$k}{now_rate},
-                $comp_href->{$k}{now_percent} - $comp_href->{$k}{old_percent}
-            );
-        } elsif ($delta_percent > 2 && $comp_href->{$k}{now_rate} < 0) {
-            printf($analysis_fp "调入减速: ");
-            printf($analysis_fp "%11s.X\t%.2f%%\t%.2f%%\n", $k,
-                $comp_href->{$k}{now_rate},
-                $comp_href->{$k}{now_percent} - $comp_href->{$k}{old_percent}
-            );
-        } elsif ($delta_percent < -2 && $comp_href->{$k}{now_rate} < 0) {
-            printf($analysis_fp "调出加速: ");
-            printf($analysis_fp "%11s.X\t%.2f%%\t%.2f%%\n", $k,
-                $comp_href->{$k}{old_rate},
-                $comp_href->{$k}{old_percent} - $comp_href->{$k}{new_percent}
-            );
-        } elsif ($delta_percent < -2 && $comp_href->{$k}{now_rate} > 0) {
-            printf($analysis_fp "调出减速: ");
-            printf($analysis_fp "%11s.X\t%.2f%%\t%.2f%%\n", $k,
-                $comp_href->{$k}{old_rate},
-                $comp_href->{$k}{old_percent} - $comp_href->{$k}{new_percent}
-            );
-        }
+        cluster_rate_log($base_date, 
+            $comp_date, 
+            $k, 
+            $comp_href->{$k}{old_rate}, 
+            $comp_href->{$k}{now_rate},
+            $comp_href->{$k}{old_percent}, 
+            $comp_href->{$k}{now_percent},
+        );
     }
     
     for (my $i = 0; $i <= $#$base_aref; $i++) {
@@ -347,17 +311,14 @@ sub compare_cluster($$)
                 $effect
             );
 
-            if ($effect > 1 || $effect < -1) {
-                if ($base_aref->[$i][COM_TOTAL_RATE] > 0) {
-                    printf($analysis_fp "调出减速: ");
-                } else {
-                    printf($analysis_fp "调出加速: ");
-                }
-                printf($analysis_fp "%11s.X\t%.2f%%\t%.2f%%\n", $base_aref->[$i][COM_IPSEG],
-                    $base_aref->[$i][COM_TOTAL_RATE],
-                    $base_aref->[$i][COM_PERCENT],
-                );
-            }
+            cluster_rate_log($base_date, 
+                "", 
+                $base_aref->[$i][COM_IPSEG],
+                $base_aref->[$i][COM_TOTAL_RATE],
+                0,
+                $base_aref->[$i][COM_PERCENT],
+                0,
+            );
         }
     }
 
@@ -378,21 +339,125 @@ sub compare_cluster($$)
                 $effect
             );
             
-            if ($effect > 1 || $effect < -1) {
-                if ($comp_aref->[$i][COM_TOTAL_RATE] > 0) {
-                    printf($analysis_fp "调入加速: ");
-                } else {
-                    printf($analysis_fp "调入减速: ");
-                }
-                printf($analysis_fp "%11s.X\t%.2f%%\t%.2f%%\n", $comp_aref->[$i][COM_IPSEG],
-                    $comp_aref->[$i][COM_TOTAL_RATE],
-                    $comp_aref->[$i][COM_PERCENT],
-                );
-            }
+            cluster_rate_log("", 
+                $comp_date, 
+                $comp_aref->[$i][COM_IPSEG],
+                0,
+                $comp_aref->[$i][COM_TOTAL_RATE],
+                0,
+                $comp_aref->[$i][COM_PERCENT],
+            );
         }
     }
 
     return $comp_href;
+}
+
+sub cluster_rate_log($$$$$$$)
+{
+    my ($date_base, $date_comp, $ipseg, $rate_base, $rate_comp, $perc_base, $perc_comp) = @_;
+
+    return 0 if is_out_cluster($ipseg);
+
+    if (($date_base ne '') && ($date_comp ne '')) {
+        my $rate = $rate_comp - $rate_base;
+        my $percent = ($perc_comp + $perc_base) / 2;
+        my $effect = $rate * $percent / 100;
+        my $flag = 0;
+
+        if ($effect < -0.5) {
+            printf($analysis_fp "[$ipseg 性能下降]\n");
+            $flag = 1;
+        } elsif ($effect > 0.5) {
+            printf($analysis_fp "[$ipseg 性能提高]\n");
+            $flag = 1;
+        }
+
+        if ($flag) {
+            printf($analysis_fp "性能变化差值: %.2f%%\n" . 
+                "占测速比例: %.2f%%\n" . 
+                "影响测速百分比: %.2f%%\n" . 
+                "%s性能: %.2f%%\n" . 
+                "%s性能: %.2f%%\n" . 
+                "%s占测速比例: %.2f%%\n" .
+                "%s占测速比例: %.2f%%\n\n",
+                $rate,
+                $percent,
+                $effect,
+                $date_base, $rate_base,
+                $date_comp, $rate_comp,
+                $date_base, $perc_base,
+                $date_comp, $perc_comp,
+            );
+        }
+
+        return 1 if ($flag);
+
+        use constant {DELTA_PERCENT=>2, NEG_DELTA_PERCENT=>-2};
+        my $delta_percent = $perc_comp - $perc_base;
+        my $delta_rate = ($rate_comp * $delta_percent / 100);
+        if ($delta_percent > DELTA_PERCENT && $rate_comp > 0) {
+            printf($analysis_fp "[$ipseg 调入导致性能提高]\n");
+            $flag = 1;
+        } elsif ($delta_percent > DELTA_PERCENT && $rate_comp < 0) {
+            printf($analysis_fp "[$ipseg 调入导致性能下降]\n");
+            $flag = 1;
+        } elsif ($delta_percent < NEG_DELTA_PERCENT && $rate_base < 0) {
+            printf($analysis_fp "[$ipseg 调出导致性能提高]\n");
+            $flag = 1;
+        } elsif ($delta_percent < NEG_DELTA_PERCENT && $rate_base > 0) {
+            printf($analysis_fp "[$ipseg 调出导致性能下降]\n");
+            $flag = 1;
+        }
+
+        if ($flag) {
+            printf($analysis_fp "性能变化差值: %.2f%%\n" . 
+                "占测速比例: %.2f%%\n" . 
+                "影响测速百分比: %.2f%%\n\n", 
+                $rate_comp,
+                $delta_percent,
+                $delta_rate,
+            );
+        }
+    } 
+    elsif (($date_base ne '') && ($date_comp eq '')) {
+        my $effect = $rate_base * $perc_base / 100;
+        if ($effect > 1 || $effect < -1) {
+            if ($rate_base > 0) {
+                printf($analysis_fp "[$ipseg 调出导致性能下降]\n");
+            } else {
+                printf($analysis_fp "[$ipseg 调出导致性能提高]\n");
+            }
+
+            printf($analysis_fp "性能变化差值: %.2f%%\n" . 
+                "占测速比例: %.2f%%\n" . 
+                "影响测速百分比: %.2f%%\n\n", 
+                $rate_base,
+                $perc_base,
+                $effect,
+            );
+        }
+    }
+    elsif (($date_base eq '') && ($date_comp ne '')) {
+        my $effect = $rate_comp * $perc_comp / 100;
+        if ($effect > 1 || $effect < -1) {
+            if ($rate_comp > 0) {
+                printf($analysis_fp "[$ipseg 调入导致性能提高]\n");
+            } else {
+                printf($analysis_fp "[$ipseg 调入导致性能下降]\n");
+            }
+
+            printf($analysis_fp "性能变化差值: %.2f%%\n" . 
+                "占测速比例: %.2f%%\n" . 
+                "影响测速百分比: %.2f%%\n\n", 
+                $rate_comp,
+                $perc_comp,
+                $effect,
+            );
+        }
+    }
+
+    return 1;
 }
 
 sub delta_daily($$)
@@ -421,26 +486,62 @@ my @cluster_out = (
     '54.248.83', 
 );
 
-sub cluster_slow_daily($)
+sub is_out_cluster($)
 {
-    my $date = shift;
-    my $sql = qq/select ipseg,total_rate,count,percent from cluster_cesu_daily where time like "$date %" and percent>0.5 and total_rate<-10 order by total_rate/;
+    my $ipseg = shift;
+    foreach my $out (@cluster_out) {
+        return 1 if ($out eq $ipseg);
+    }
+    return 0;
+}
+
+sub cluster_slow_log($$)
+{
+    my ($yesterday, $today) = @_;
+    my $sql = qq/select ipseg,total_rate,count,percent from cluster_cesu_daily where time like "$today %" and percent>0.5 and total_rate<-10 order by total_rate/;
+
+    printf($analysis_fp "\n### 速度比源站慢超过10%%的机房 %s ###\n", $today);
 
     my $recs = $dbh->query($sql);
     LOOP: for (my $i = 0; $i <= $#$recs; $i++) {
-        foreach my $out (@cluster_out) {
-            next LOOP if ($out eq $recs->[$i][COM_IPSEG]);
-        }
+        next LOOP if is_out_cluster($recs->[$i][COM_IPSEG]);
 
-        printf($analysis_fp "ipseg: %s\trate: %.2f\tcount: %d\tpercent: %.2f\n",
+        $sql = qq/select total_rate from cluster_cesu_daily where ipseg='$recs->[$i][COM_IPSEG]' and time like '$yesterday %'/;
+        my $yesterday_rate = $dbh->query_count($sql);
+        $yesterday_rate = 0 if !$yesterday_rate;
+
+        printf($analysis_fp "[机房: %s]\n比源站慢: %.2f%%\n占测速比重: %.2f%%\n%s此机房性能: %.2f%%\n\n",
             $recs->[$i][COM_IPSEG],
             $recs->[$i][COM_TOTAL_RATE],
-            $recs->[$i][COM_COUNT],
             $recs->[$i][COM_PERCENT],
+            $yesterday, $yesterday_rate,
         );
     }
 }
 
+sub cesu_daily_log($$)
+{
+    my ($yesterday, $today) = @_;
+    my $ydata = 0;
+    my $tdata = 0;
+    my $ytime = '';
+    my $ttime = '';
+
+    my $sql = qq/select bigzero,date(time) from cesu_daily where time like '$yesterday %' or time like '$today %'/;
+    my $recs = $dbh->query($sql);
+
+    $ydata = $recs->[0][0] if $recs->[0][0];
+    $tdata = $recs->[1][0] if $recs->[1][0];
+    $ytime = $recs->[0][1] if $recs->[0][1];
+    $ttime = $recs->[1][1] if $recs->[1][1];
+
+    printf($analysis_fp "\n### 加速比 ###\n%s: %.2f%%\n%s: %.2f%%\n\n", 
+        $ytime, $ydata,
+        $ttime, $tdata,
+    );
+
+    return 1;
+}
 
 #
 # begin to run
@@ -455,17 +556,18 @@ $dbh = BMD::DBH->new(
     'dbport' => 3306
 );
 
-#speed_data_analysis($date);
+#speed_data_analysis($today);
 
-#cluster_cesu_daily($date);
+#cluster_cesu_daily($today);
 
 open($analysis_fp, ">/tmp/analysis_daily.txt");
 
-#compare_cluster("2013-04-22", "2013-04-27");
-#compare_cluster("2013-05-01", "2013-05-02");
-compare_cluster("2013-05-05", "2013-05-06");
+cesu_daily_log($yesterday, $today);
 
-cluster_slow_daily("2013-05-06");
+printf($analysis_fp "\n### 机房性能变化 %s ~ %s ###\n", $yesterday, $today);
+compare_cluster($yesterday, $today);
+
+cluster_slow_log($yesterday, $today);
 close($analysis_fp);
 $dbh->fini();
 
