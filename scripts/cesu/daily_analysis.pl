@@ -11,8 +11,14 @@ use Time::Interval;
 
 my $keyword = "total_time";
 
-my $yesterday = "2013-05-07";
-my $today     = "2013-05-08";
+my $today     = `date -d "-1 day" +"%Y-%m-%d"`;
+my $yesterday = `date -d "-2 day" +"%Y-%m-%d"`;
+
+$today     =~ tr/\n//d;
+$yesterday =~ tr/\n//d;
+
+#$today     = "2013-05-09";
+#$yesterday = "2013-05-08";
 
 my $dbh;
 my $do_db = 1;
@@ -393,7 +399,7 @@ sub cluster_rate_log($$$$$$$)
 
         return 1 if ($flag);
 
-        use constant {DELTA_PERCENT=>2, NEG_DELTA_PERCENT=>-2};
+        use constant {DELTA_PERCENT=>5, NEG_DELTA_PERCENT=>-5};
         my $delta_percent = $perc_comp - $perc_base;
         my $delta_rate = ($rate_comp * $delta_percent / 100);
         if ($delta_percent > DELTA_PERCENT && $rate_comp > 0) {
@@ -510,7 +516,7 @@ sub cluster_slow_log($$)
         my $yesterday_rate = $dbh->query_count($sql);
         $yesterday_rate = 0 if !$yesterday_rate;
 
-        printf($analysis_fp "[机房: %s]\n比源站慢: %.2f%%\n占测速比重: %.2f%%\n%s此机房性能: %.2f%%\n\n",
+        printf($analysis_fp "[机房: %s]\n比源站慢: %.2f%%\n占测速比重: %.2f%%\n%s此机房比源站慢: %.2f%%\n\n",
             $recs->[$i][COM_IPSEG],
             $recs->[$i][COM_TOTAL_RATE],
             $recs->[$i][COM_PERCENT],
@@ -519,26 +525,55 @@ sub cluster_slow_log($$)
     }
 }
 
+use constant {
+    CESU_BIGZERO    => 0,
+    CESU_FAST       => 1,
+    CESU_FASTAVG    => 2,
+    CESU_ALLBIGZERO => 3,
+    CESU_ALLFASTAVG => 4,
+    CESU_ALLTOTAL   => 5,
+    CESU_DATE       => 6,
+};
+
 sub cesu_daily_log($$)
 {
     my ($yesterday, $today) = @_;
-    my $ydata = 0;
-    my $tdata = 0;
-    my $ytime = '';
-    my $ttime = '';
 
-    my $sql = qq/select bigzero,date(time) from cesu_daily where time like '$yesterday %' or time like '$today %'/;
+    my $sql = qq/select bigzero,fast,fastavg,all_bigzero,all_fastavg,all_total,date(time) from cesu_daily where date(time)='$yesterday'/;
     my $recs = $dbh->query($sql);
+    my ($y_b, $y_f, $y_fa, $y_ab, $y_af, $y_at, $y_d) = ( 
+        $recs->[0][CESU_BIGZERO],
+        $recs->[0][CESU_FAST],
+        $recs->[0][CESU_FASTAVG],
+        $recs->[0][CESU_ALLBIGZERO],
+        $recs->[0][CESU_ALLFASTAVG],
+        $recs->[0][CESU_ALLTOTAL],
+        $recs->[0][CESU_DATE]) if ($recs->[0]);
 
-    $ydata = $recs->[0][0] if $recs->[0][0];
-    $tdata = $recs->[1][0] if $recs->[1][0];
-    $ytime = $recs->[0][1] if $recs->[0][1];
-    $ttime = $recs->[1][1] if $recs->[1][1];
+    $sql = qq/select bigzero,fast,fastavg,all_bigzero,all_fastavg,all_total,date(time) from cesu_daily where date(time)='$today'/;
+    $recs = $dbh->query($sql);
+    my ($t_b, $t_f, $t_fa, $t_ab, $t_af, $t_at, $t_d) = (
+        $recs->[0][CESU_BIGZERO],
+        $recs->[0][CESU_FAST],
+        $recs->[0][CESU_FASTAVG],
+        $recs->[0][CESU_ALLBIGZERO],
+        $recs->[0][CESU_ALLFASTAVG],
+        $recs->[0][CESU_ALLTOTAL],
+        $recs->[0][CESU_DATE]) if ($recs->[0]);
 
-    printf($analysis_fp "\n### 加速比 ###\n%s: %.2f%%\n%s: %.2f%%\n\n", 
-        $ytime, $ydata,
-        $ttime, $tdata,
+    printf($analysis_fp "\n### 加速比 ###\n" .
+        "%s: %.2f%%\tFAST: %.2f%%; FASTAVG: %.2f%%; ALL_BIGZERO: %.2f%%; ALL_FASTAVG: %.2f%%; ALL_TOTAL: %d\n" .
+        "%s: %.2f%%\tFAST: %.2f%%; FASTAVG: %.2f%%; ALL_BIGZERO: %.2f%%; ALL_FASTAVG: %.2f%%; ALL_TOTAL: %d\n", 
+        $yesterday, $y_b, $y_f, $y_fa, $y_ab, $y_af, $y_at, 
+        $today, $t_b, $t_f, $t_fa, $t_ab, $t_af, $t_at,
     );
+
+    my $delta = $t_b - $y_b;
+    if ($delta > 0) {
+        printf($analysis_fp "加速提升: %.2f%%\n\n", $delta);
+    } else {
+        printf($analysis_fp "加速下降: %.2f%%\n\n", $delta);
+    }
 
     return 1;
 }
@@ -556,9 +591,9 @@ $dbh = BMD::DBH->new(
     'dbport' => 3306
 );
 
-#speed_data_analysis($today);
+speed_data_analysis($today);
 
-#cluster_cesu_daily($today);
+cluster_cesu_daily($today);
 
 open($analysis_fp, ">/tmp/analysis_daily.txt");
 
