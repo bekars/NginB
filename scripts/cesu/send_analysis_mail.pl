@@ -8,17 +8,13 @@ use Authen::SASL;
 use MIME::Base64;
 use Encode;
 
-my $today = `date -d "-1 day" +"%Y-%m-%d"`;
+my $today = `date +"%Y-%m-%d"`;
 
 my @mail_addr = (
-    'yu.bai@unlun.com',
-    't@unlun.com',
-    'chao.chen@unlun.com',
-    'yi.chen@unlun.com',
-    'li.huang@unlun.com',
-    'xl.hao@unlun.com',
-    'zhen.cui@unlun.com',
+    'fast@unlun.com',
+    'op@unlun.com',
     'ff@unlun.com',
+    'jie.ma@unlun.com',
 );
 
 sub send_mail($)
@@ -29,9 +25,9 @@ sub send_mail($)
     my $mail_server = 'anquanbao.com.cn';
     my $mail_from   = 'donotreply@anquanbao.com.cn';
 
-    my $from    = "From: $mail_user\n";
+    my $from    = "From: yu.bai\@unlun.com\n";
     my $to      = "To: $to_addr\n";
-    my $subject = "[AQB测速分析] 每日测速监控 $today\n\n";
+    my $subject = "[AQB测速分析] $today 测速监控数据\n\n";
 
     my $message = ""; 
     open(my $fp, "</tmp/analysis_daily.txt");
@@ -44,7 +40,9 @@ sub send_mail($)
 
     $smtp->auth($mail_user, $mail_pwd) || die "Auth Error! $!";
     $smtp->mail($mail_from);
-    $smtp->to($to_addr);
+    foreach my $mto (@mail_addr) {
+        $smtp->to($mto);
+    }
 
     $smtp->data();
     $smtp->datasend($from);
@@ -58,11 +56,10 @@ sub send_mail($)
 }
 
 
-foreach my $m (@mail_addr) {
-    say "send mail to $m ...";
-    send_mail($m);
-}
+my $to_addr = join(', ', @mail_addr);
+say "send mail to $to_addr ...";
+send_mail($to_addr);
+
 
 1;
-
 

@@ -17,8 +17,8 @@ my $yesterday = `date -d "-2 day" +"%Y-%m-%d"`;
 $today     =~ tr/\n//d;
 $yesterday =~ tr/\n//d;
 
-#$today     = "2013-05-09";
-#$yesterday = "2013-05-08";
+#$yesterday = "2013-05-07";
+#$today     = "2013-05-08";
 
 my $dbh;
 my $do_db = 1;
@@ -529,51 +529,61 @@ use constant {
     CESU_BIGZERO    => 0,
     CESU_FAST       => 1,
     CESU_FASTAVG    => 2,
-    CESU_ALLBIGZERO => 3,
-    CESU_ALLFASTAVG => 4,
-    CESU_ALLTOTAL   => 5,
-    CESU_DATE       => 6,
+    CESU_SLOW       => 3,
+    CESU_ALLBIGZERO => 4,
+    CESU_ALLFASTAVG => 5,
+    CESU_ALLTOTAL   => 6,
+    CESU_DATE       => 7,
 };
 
 sub cesu_daily_log($$)
 {
     my ($yesterday, $today) = @_;
 
-    my $sql = qq/select bigzero,fast,fastavg,all_bigzero,all_fastavg,all_total,date(time) from cesu_daily where date(time)='$yesterday'/;
+    my $sql = qq/select bigzero,fast,fastavg,slow,all_bigzero,all_fastavg,all_total,date(time) from cesu_daily where date(time)='$yesterday'/;
     my $recs = $dbh->query($sql);
-    my ($y_b, $y_f, $y_fa, $y_ab, $y_af, $y_at, $y_d) = ( 
+    my ($y_b, $y_f, $y_fa, $y_s, $y_ab, $y_af, $y_at, $y_d) = ( 
         $recs->[0][CESU_BIGZERO],
         $recs->[0][CESU_FAST],
         $recs->[0][CESU_FASTAVG],
+        $recs->[0][CESU_SLOW],
         $recs->[0][CESU_ALLBIGZERO],
         $recs->[0][CESU_ALLFASTAVG],
         $recs->[0][CESU_ALLTOTAL],
         $recs->[0][CESU_DATE]) if ($recs->[0]);
 
-    $sql = qq/select bigzero,fast,fastavg,all_bigzero,all_fastavg,all_total,date(time) from cesu_daily where date(time)='$today'/;
+    $sql = qq/select bigzero,fast,fastavg,slow,all_bigzero,all_fastavg,all_total,date(time) from cesu_daily where date(time)='$today'/;
     $recs = $dbh->query($sql);
-    my ($t_b, $t_f, $t_fa, $t_ab, $t_af, $t_at, $t_d) = (
+    my ($t_b, $t_f, $t_fa, $t_s, $t_ab, $t_af, $t_at, $t_d) = (
         $recs->[0][CESU_BIGZERO],
         $recs->[0][CESU_FAST],
         $recs->[0][CESU_FASTAVG],
+        $recs->[0][CESU_SLOW],
         $recs->[0][CESU_ALLBIGZERO],
         $recs->[0][CESU_ALLFASTAVG],
         $recs->[0][CESU_ALLTOTAL],
         $recs->[0][CESU_DATE]) if ($recs->[0]);
 
     printf($analysis_fp "\n### 加速比 ###\n" .
-        "%s: %.2f%%\tFAST: %.2f%%; FASTAVG: %.2f%%; ALL_BIGZERO: %.2f%%; ALL_FASTAVG: %.2f%%; ALL_TOTAL: %d\n" .
-        "%s: %.2f%%\tFAST: %.2f%%; FASTAVG: %.2f%%; ALL_BIGZERO: %.2f%%; ALL_FASTAVG: %.2f%%; ALL_TOTAL: %d\n", 
-        $yesterday, $y_b, $y_f, $y_fa, $y_ab, $y_af, $y_at, 
-        $today, $t_b, $t_f, $t_fa, $t_ab, $t_af, $t_at,
+        "%s比源站快%%: %.2f%%\n" .
+        "%s比源站快%%: %.2f%%\n", 
+        $yesterday, $y_b, 
+        $today, $t_b,
     );
 
     my $delta = $t_b - $y_b;
     if ($delta > 0) {
-        printf($analysis_fp "加速提升: %.2f%%\n\n", $delta);
+        printf($analysis_fp "加速提升: %.2f%%\n", $delta);
     } else {
-        printf($analysis_fp "加速下降: %.2f%%\n\n", $delta);
+        printf($analysis_fp "减速下降: %.2f%%\n", $delta);
     }
+
+    printf($analysis_fp 
+        "\n%s详细数据 BIGZERO: %.2f%%; FAST: %.2f%%; FASTAVG: %.2f%%; SLOW: %.2f%%; ALL_BIGZERO: %.2f%%; ALL_FASTAVG: %.2f%%; ALL_TOTAL: %d\n" .
+        "%s详细数据 BIGZERO: %.2f%%; FAST: %.2f%%; FASTAVG: %.2f%%; SLOW: %.2f%%; ALL_BIGZERO: %.2f%%; ALL_FASTAVG: %.2f%%; ALL_TOTAL: %d\n\n", 
+        $yesterday, $y_b, $y_f, $y_fa, $y_s, $y_ab, $y_af, $y_at, 
+        $today, $t_b, $t_f, $t_fa, $t_s, $t_ab, $t_af, $t_at,
+    );
 
     return 1;
 }
@@ -597,6 +607,7 @@ cluster_cesu_daily($today);
 
 open($analysis_fp, ">/tmp/analysis_daily.txt");
 
+printf($analysis_fp "\n对比%s和%s的测速数据\n", $yesterday, $today);
 cesu_daily_log($yesterday, $today);
 
 printf($analysis_fp "\n### 机房性能变化 %s ~ %s ###\n", $yesterday, $today);
