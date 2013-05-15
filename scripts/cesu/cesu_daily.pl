@@ -4,7 +4,6 @@ use strict;
 use 5.010;
 use Speedy::AQB;
 use Speedy::Utils;
-use Speedy::Http;
 use Data::Dumper;
 use BMD::DBH;
 
