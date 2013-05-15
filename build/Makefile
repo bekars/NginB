@@ -4,15 +4,16 @@ NGX_MOD_PATH      = $(TOP_PATH)/modules
 NGX_MOD_MORE_PATH = $(NGX_PATH)/src/nginx_mods
 
 NGX_MOD_CONFIG    = \
-	--http-proxy-temp-path=/data/nginx/cache_tmp \
 	--error-log-path=/var/log/error.log \
 	--pid-path=/var/run/nginx.pid \
+	--with-debug \
 	--with-pcre \
 	--with-poll_module \
 	--http-fastcgi-temp-path=/data/nginx/fcgi/ \
 	--with-http_ssl_module \
 	--with-http_sub_module \
 	--with-http_stub_status_module \
+	--http-proxy-temp-path=/data/nginx/cache_tmp \
 	--add-module=${NGX_MOD_MORE_PATH}/echo-nginx-module \
 	--add-module=${NGX_MOD_MORE_PATH}/ngx_devel_kit \
 	--add-module=${NGX_MOD_MORE_PATH}/lua-nginx-module \
@@ -24,16 +25,13 @@ NGX_MOD_CONFIG    = \
 	--add-module=${NGX_MOD_PATH}/mod_aqb \
 	--add-module=${NGX_MOD_MORE_PATH}/srcache-nginx-module
 		
-#NGX_MOD_CONFIG   += --add-module=${NGX_MOD_MORE_PATH}/ngx_pagespeed
 
 all: config build
 
 PHONY += config
 config:
 	cd ${NGX_PATH}; \
-	./configure --with-debug \
-		--with-http_stub_status_module \
-		${NGX_MOD_CONFIG}
+	./configure ${NGX_MOD_CONFIG}
 
 PHONY += build
 build:
