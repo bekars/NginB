@@ -16,7 +16,7 @@ $today      =~ tr/\n//d;
 my $dbh;
 my $do_db = 1;
 
-my $date_g = "20130519";
+my $date_g = "20130518";
 
 # record cluster data
 my $cluster_href;
@@ -140,7 +140,8 @@ sub gen_speed_excel_data()
     my ($fast, $slow);
 
     open(my $fp, ">/tmp/hit_downspeed.txt");
-   
+    $fp->autoflush(1);
+
     printf($fp "cluster\t<10k\t10~20k\t20~30k\t30~40k\t40~50k\t50~100k\t100~200k\t200~500k\t>500k\tfast%%\tcount\n");
 
     foreach my $k (sort{$cluster_href->{$b}{hit_cnt} <=> $cluster_href->{$a}{hit_cnt}} keys %$cluster_href) {
@@ -174,6 +175,7 @@ sub gen_client_excel_data()
 {
     my $slow_cnt;
     open(my $fp, ">/tmp/hit_client.txt");
+    $fp->autoflush(1);
 
     foreach my $k (sort{$cluster_href->{$b}{hit_cnt} <=> $cluster_href->{$a}{hit_cnt}} keys %$cluster_href) {
         $slow_cnt = 0;
@@ -182,7 +184,8 @@ sub gen_client_excel_data()
         foreach my $p (sort keys %{$cluster_href->{$k}{slowip}}) {
             $slow_cnt += $cluster_href->{$k}{slowip}{$p};
         }
-        foreach my $p (sort keys %{$cluster_href->{$k}{slowip}}) {
+
+        foreach my $p (sort {$cluster_href->{$k}{slowip}{$b} <=> $cluster_href->{$k}{slowip}{$a}} keys %{$cluster_href->{$k}{slowip}}) {
             printf($fp "\t%s %.2f%%\n", $p, $cluster_href->{$k}{slowip}{$p} * 100 / $slow_cnt);
         }
         printf("\n");
@@ -197,7 +200,7 @@ sub gen_client_excel_data()
 #
 list_hit_clusters();
 
-foreach my $k (sort{$cluster_href->{$a}{hit_cnt} <=> $cluster_href->{$b}{hit_cnt}} keys %$cluster_href) {
+foreach my $k (sort{$cluster_href->{$b}{hit_cnt} <=> $cluster_href->{$a}{hit_cnt}} keys %$cluster_href) {
     printf("$k => $cluster_href->{$k}{hit_cnt}\n");
     compare_hit_url($k);
     #last;
