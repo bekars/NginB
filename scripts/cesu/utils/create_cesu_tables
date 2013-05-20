@@ -76,14 +76,6 @@ CREATE TABLE `speed_data_analysis` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
-CREATE function fun_ipseg(ipaddr varchar(32))
-returns varchar(32)
-begin
-    declare ip_seg varchar(32);
-    set ip_seg = substring_index(ipaddr, ".", 3);
-    return ip_seg;
-end
-
 CREATE TABLE `cluster_cesu_daily` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `ipseg` varchar(500) NOT NULL,
@@ -108,4 +100,15 @@ CREATE TABLE `cluster_cesu_hour` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
+delimiter //
+CREATE function fun_ipseg(ipaddr varchar(32))
+returns varchar(32)
+begin
+    declare ip_seg varchar(32);
+    set ip_seg = substring_index(ipaddr, ".", 3);
+    return ip_seg;
+end
+//
+
+delimiter ;
 
