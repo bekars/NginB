@@ -1,14 +1,18 @@
 #!/usr/bin/perl -w
-
 # 统计HIT之后下载比源站慢的节点
 
 use strict;
+use 5.010;
 use Speedy::Utils;
-use Speedy::Http;
 use Data::Dumper;
-use IO::Handle;
+use BMD::DBH;
+use Time::Interval;
 
-use DBI;
+my $keyword = "total_time";
+
+my $today   = `date -d "-1 day" +"%Y-%m-%d"`;
+$today      =~ tr/\n//d;
+
 
 my $dr_sites = {};
 my $date_g = "2013-03-24";
@@ -211,4 +215,6 @@ $dbh->disconnect();
 close($fp);
 
 1;
+
+# vim: ts=4:sw=4:et
 
