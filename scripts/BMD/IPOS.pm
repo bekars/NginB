@@ -127,6 +127,7 @@ sub query($)
             $c_data = $country->{$ip_pos->[$i]->[COUNTRY]} if $ip_pos->[$i]->[COUNTRY];
             $p_data = $province->{$ip_pos->[$i]->[PROVINCE]} if $ip_pos->[$i]->[PROVINCE];
             $i_data = $isp->{$ip_pos->[$i]->[ISP]} if $ip_pos->[$i]->[ISP];
+            $i_data = "UFO" if $i_data eq "";
 
             my @c = ($ipnum, $c_data, $p_data, $i_data);
             push(@ip_cache, \@c);
@@ -140,6 +141,27 @@ sub query($)
 sub destory()
 {
     my $self = shift;
+}
+
+sub get_country_byid($)
+{
+    my $self = shift;
+    my $id = shift;
+    return $self->{country}->{$id};
+}
+
+sub get_province_byid($)
+{
+    my $self = shift;
+    my $id = shift;
+    return $self->{province}->{$id};
+}
+
+sub get_isp_byid($)
+{
+    my $self = shift;
+    my $id = shift;
+    return $self->{isp}->{$id};
 }
 
 1;
