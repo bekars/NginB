@@ -1,11 +1,12 @@
 #!/usr/bin/perl -w
-# 统计HIT之后下载比源站慢的节点
+# 统计HIT之后下载比源站慢的节点，以及下载文件大小的统计数据
 
 use strict;
 use 5.010;
 use Speedy::Utils;
 use Data::Dumper;
 use BMD::DBH;
+use BMD::IPOS;
 use Time::Interval;
 
 my $keyword = "total_time";
@@ -13,10 +14,7 @@ my $keyword = "total_time";
 my $today   = `date -d "-1 day" +"%Y-%m-%d"`;
 $today      =~ tr/\n//d;
 
-my $dbh;
-my $do_db = 1;
-
-my $date_g = "20130518";
+my $date_g = "20130520";
 
 # record cluster data
 my $cluster_href;
@@ -33,19 +31,6 @@ my %file_size = (
     '500' => '10000',
 );
 
-
-
-$dbh = BMD::DBH->new(
-    'dbhost' => '116.213.78.228',
-    'dbuser' => 'cesutest',
-    'dbpass' => 'cesutest',
-    #'dbuser' => 'cesureadonly',
-    #'dbpass' => '66ecf9c968132321a02e6e7aff34ce5d',
-    'dbname' => 'speed',
-    'dbport' => 3306
-);
-
-
 use constant {
     URL         => 0,
     ROLE_ID     => 1,
@@ -58,6 +43,18 @@ use constant {
     TIME        => 8,
 };
 
+my $ipos = BMD::IPOS->new();
+$ipos->load("/opt/ip_pos.db");
+
+my $dbh = BMD::DBH->new(
+    'dbhost' => '116.213.78.228',
+    'dbuser' => 'cesutest',
+    'dbpass' => 'cesutest',
+    #'dbuser' => 'cesureadonly',
+    #'dbpass' => '66ecf9c968132321a02e6e7aff34ce5d',
+    'dbname' => 'speed',
+    'dbport' => 3306
+);
 
 sub list_hit_clusters()
 {
@@ -177,23 +174,37 @@ sub gen_client_excel_data()
     open(my $fp, ">/tmp/hit_client.txt");
     $fp->autoflush(1);
 
+    my ($country, $province, $isp);
+
     foreach my $k (sort{$cluster_href->{$b}{hit_cnt} <=> $cluster_href->{$a}{hit_cnt}} keys %$cluster_href) {
         $slow_cnt = 0;
-        printf($fp "[$k]\n");
-        
         foreach my $p (sort keys %{$cluster_href->{$k}{slowip}}) {
             $slow_cnt += $cluster_href->{$k}{slowip}{$p};
         }
 
+        printf($fp "[%s %s %d]\n", $k, join(",", get_ipseg_pos($k)), $slow_cnt);
+
         foreach my $p (sort {$cluster_href->{$k}{slowip}{$b} <=> $cluster_href->{$k}{slowip}{$a}} keys %{$cluster_href->{$k}{slowip}}) {
-            printf($fp "\t%s %.2f%%\n", $p, $cluster_href->{$k}{slowip}{$p} * 100 / $slow_cnt);
+            ($country, $province, $isp) = get_ipseg_pos($p);
+            $cluster_href->{$k}{clipos}{"$province-$isp"} += $cluster_href->{$k}{slowip}{$p};
         }
-        printf("\n");
+
+        foreach my $c (sort {$cluster_href->{$k}{clipos}{$b} <=> $cluster_href->{$k}{clipos}{$a}} keys %{$cluster_href->{$k}{clipos}}) {
+            printf($fp "\t%s %.2f%% %d\n", $c, 
+                $cluster_href->{$k}{clipos}{$c} * 100 / $slow_cnt,
+                $cluster_href->{$k}{clipos}{$c}
+            );
+        }
     }
 
     close($fp);
 }
 
+sub get_ipseg_pos($)
+{
+    my $ipseg = shift;
+    return $ipos->query("$ipseg.1");
+}
 
 #
 # main start
@@ -208,10 +219,10 @@ foreach my $k (sort{$cluster_href->{$b}{hit_cnt} <=> $cluster_href->{$a}{hit_cnt
 
 printf(Dumper($cluster_href));
 
-$dbh->fini();
-
 gen_speed_excel_data();
 gen_client_excel_data();
+
+$dbh->fini();
 
 1;
 

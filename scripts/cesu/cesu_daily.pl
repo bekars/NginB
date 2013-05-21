@@ -8,7 +8,7 @@ use Data::Dumper;
 use BMD::DBH;
 
 my $keyword = "total_time";
-my $date = `date -d "last day" +"%Y-%m-%d"`;#"2013-05-05";
+my $date = `/bin/date -d "last day" +"%Y-%m-%d"`;#"2013-05-05";
 
 my $site_rate_href = ();
 my $dbh;

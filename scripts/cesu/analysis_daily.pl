@@ -9,8 +9,8 @@ use Time::Interval;
 
 my $keyword = "total_time";
 
-my $today     = `date -d "-1 day" +"%Y-%m-%d"`;
-my $yesterday = `date -d "-2 day" +"%Y-%m-%d"`;
+my $today     = `/bin/date -d "-1 day" +"%Y-%m-%d"`;
+my $yesterday = `/bin/date -d "-2 day" +"%Y-%m-%d"`;
 
 $today     =~ tr/\n//d;
 $yesterday =~ tr/\n//d;
@@ -577,13 +577,25 @@ sub cesu_daily_log($$)
     }
 
     printf($analysis_fp 
-        "\n%s详细数据 BIGZERO: %.2f%%; FAST: %.2f%%; FASTAVG: %.2f%%; SLOW: %.2f%%; ALL_BIGZERO: %.2f%%; ALL_FASTAVG: %.2f%%; ALL_TOTAL: %d\n" .
-        "%s详细数据 BIGZERO: %.2f%%; FAST: %.2f%%; FASTAVG: %.2f%%; SLOW: %.2f%%; ALL_BIGZERO: %.2f%%; ALL_FASTAVG: %.2f%%; ALL_TOTAL: %d\n\n", 
+        "\n%s详细数据 比源站快: %.2f%%; 快>10%%: %.2f%%; 平均加速幅度: %.2f%%; 慢<-10%%: %.2f%%; 所有测速站比源站快: %.2f%%; 所有测速站平均加速幅度: %.2f%%; 测速站总数: %d\n" .
+        "%s详细数据 比源站快: %.2f%%; 快>10%%: %.2f%%; 平均加速幅度: %.2f%%; 慢<-10%%: %.2f%%; 所有测速站比源站快: %.2f%%; 所有测速站平均加速幅度: %.2f%%; 测速站总数: %d\n\n", 
         $yesterday, $y_b, $y_f, $y_fa, $y_s, $y_ab, $y_af, $y_at, 
         $today, $t_b, $t_f, $t_fa, $t_s, $t_ab, $t_af, $t_at,
     );
 
     return 1;
+}
+
+sub cache_hit_log($)
+{
+    my ($today) = @_;
+    my $sql = qq/select cachehit from cache_hit where date(time)="$today"/;
+    my $cachehit = $dbh->query_count($sql);
+
+    $sql = qq/select cacherate_flow from cache_hit where date(time)="$today"/;
+    my $cacherate = $dbh->query_count($sql);
+
+    printf($analysis_fp "\n### 缓存命中率 %s ###\n缓存命中率: %.2f%%  缓存率: %.2f%%\n\n", $today, $cachehit, $cacherate);
 }
 
 #
@@ -607,6 +619,8 @@ open($analysis_fp, ">/tmp/analysis_daily.txt");
 
 printf($analysis_fp "\n对比%s和%s的测速数据\n", $yesterday, $today);
 cesu_daily_log($yesterday, $today);
+
+cache_hit_log($today);
 
 printf($analysis_fp "\n### 机房性能变化 %s ~ %s ###\n", $yesterday, $today);
 compare_cluster($yesterday, $today);

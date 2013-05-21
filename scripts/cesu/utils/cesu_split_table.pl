@@ -142,6 +142,8 @@ $dbh->disconnect();
 
 1;
 
+# vim: ts=4:sw=4:et
+
 =pod
 CREATE TABLE `speed_res_data_all` (
   `id` int(20) unsigned NOT NULL AUTO_INCREMENT,

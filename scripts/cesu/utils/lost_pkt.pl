@@ -231,8 +231,8 @@ sub load_ip_pos($)
             push(@rec_a, \@rec_data);
         }
         close($ipfp);
-        $ip_pos = \@rec_a;
     }
+    $ip_pos = \@rec_a;
 
     printf("### load country\n");
     $sql = "select id,country from country";

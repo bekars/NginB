@@ -8,13 +8,14 @@ use Authen::SASL;
 use MIME::Base64;
 use Encode;
 
-my $today = `date +"%Y-%m-%d"`;
+my $today = `/bin/date +"%Y-%m-%d"`;
 
 my @mail_addr = (
     'fast@unlun.com',
     'op@unlun.com',
     'ff@unlun.com',
     'jie.ma@unlun.com',
+    'bekars@126.com',
 );
 
 sub send_mail($)
