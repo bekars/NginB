@@ -177,7 +177,7 @@ sub gen_speed_excel_data()
             }
         }
 
-        if (exists($cluster_href->{$k}{fast_cnt})) {
+        if (exists($cluster_href->{$k}{fast_cnt}) && exists($cluster_href->{$k}{slow_cnt})) {
             printf($fp "%.2f\t%d\n", 
                 $cluster_href->{$k}{fast_cnt} * 100 / ($cluster_href->{$k}{fast_cnt} + $cluster_href->{$k}{slow_cnt}), $cluster_href->{$k}{hit_cnt});
         } else {

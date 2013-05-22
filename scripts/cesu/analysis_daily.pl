@@ -137,7 +137,7 @@ sub speed_data_analysis($)
         ++$count;
 
         foreach my $key_city (sort keys %$city_code) {
-            $sql = qq/select role_id,role_name,role_ip,total_time,tcp_time,response_time,download_speed,monitor_time,dns_time,error_id from speed_monitor_data where date(monitor_time)="$date" and role_name like "${site}_%" and city_code=$key_city order by monitor_time/;
+            $sql = qq/select role_id,role_name,role_ip,total_time,tcp_time,response_time,download_speed,monitor_time,dns_time,error_id from speed_monitor_data where monitor_time>="$date 00:00:00" and monitor_time<="$date 23:59:59" and role_name like "${site}_%" and city_code=$key_city order by monitor_time/;
             my $site_city_aref = $dbh->query($sql);
 
             foreach my $key_clock (sort keys %$clock) {
