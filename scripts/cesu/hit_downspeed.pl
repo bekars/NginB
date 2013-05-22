@@ -8,6 +8,8 @@ use Data::Dumper;
 use BMD::DBH;
 use BMD::IPOS;
 use Time::Interval;
+use autodie;
+use Try::Tiny;
 
 my $keyword = "total_time";
 
@@ -58,8 +60,10 @@ my $dbh = BMD::DBH->new(
 
 sub list_hit_clusters()
 {
+    my $sqlplus = qq//;
+
     # find hit clusters
-    my $sql = qq/select fun_ipseg(role_ip),count(*) as c from speed_res_data_${date_g} where role_name like "%%_aqb" and header like "%%X-Powered-By-Anquanbao: HIT %%" and fun_ipseg(role_ip)!='0.0.0' group by fun_ipseg(role_ip) order by c desc/;
+    my $sql = qq/select fun_ipseg(role_ip),count(*) as c from speed_res_data_${date_g} where role_name like "%%_aqb" and header like "%%X-Powered-By-Anquanbao: HIT %%" and fun_ipseg(role_ip)!='0.0.0' $sqlplus group by fun_ipseg(role_ip) order by c desc/;
     
     my $recs = $dbh->query($sql);
     for (my $i = 0; $i <= $#$recs; $i++) {
@@ -72,41 +76,45 @@ sub list_hit_clusters()
 sub compare_hit_url($) 
 {
     my $clusterip = shift;
-    my $downkbs_aqb;
-    my $downkbs_org;
+    my $downspeed_aqb;
+    my $downspeed_org;
     my $roleip_aqb;
     my $roleip_org;
     my ($url, $main_id, $filesize);
 
     # select hit url on cluster
-    my $sql = qq/select url,role_id,stat_main_id,role_ip,down_speed_kbs,city_code,client_ip,down_size_bytes,monitor_time from speed_res_data_${date_g} where role_name like "%%_aqb" and header like "%%X-Powered-By-Anquanbao: HIT %%" and fun_ipseg(role_ip)='$clusterip'/;
+    my $sql = qq/select url,role_id,stat_main_id,role_ip,down_time_s,city_code,client_ip,down_size_bytes,monitor_time from speed_res_data_${date_g} where role_name like "%%_aqb" and header like "%%X-Powered-By-Anquanbao: HIT %%" and fun_ipseg(role_ip)='$clusterip'/;
 
     my $recs = $dbh->query($sql);
     for (my $i = 0; $i <= $#$recs; $i++) {
         $url = $recs->[$i][URL];
+        $url =~ tr/%/#/;
         $main_id = $recs->[$i][MAIN_ID];
-        $downkbs_aqb = $recs->[$i][DOWNSPEED];
+        $downspeed_aqb = $recs->[$i][DOWNSPEED];
         $roleip_aqb = $recs->[$i][ROLE_IP];
         $filesize = $recs->[$i][DOWNSIZE];
 
-        ($downkbs_org, $roleip_org) = get_org_downspeed($url, $main_id);
-        if ($downkbs_org && $roleip_org) {
-            printf("$url $main_id $downkbs_aqb $roleip_aqb $downkbs_org $roleip_org\n");
+        ($downspeed_org, $roleip_org) = get_org_downspeed($url, $main_id);
+        if ($downspeed_org && $roleip_org) {
+            printf("$url $main_id $downspeed_aqb $roleip_aqb $downspeed_org $roleip_org\n");
             
             foreach my $k (sort keys %file_size) {
                 if (($filesize > ($k * 1000)) && ($filesize <= ($file_size{$k} * 1000))) {
-                    if ($downkbs_aqb >= $downkbs_org) {
+                    if ($downspeed_aqb <= $downspeed_org) {
                         $cluster_href->{$clusterip}{"filesize_$k"}{fast} += 1;
                         $cluster_href->{$clusterip}{fast_cnt} += 1;
                     } else {
                         $cluster_href->{$clusterip}{"filesize_$k"}{slow} += 1;
                         $cluster_href->{$clusterip}{slowip}{$recs->[$i][CLIENT_IP]} += 1;
                         $cluster_href->{$clusterip}{slow_cnt} += 1;
+
+                        # log slow client region and url
+                        log_url($recs->[$i][CLIENT_IP], $roleip_org, $url);
                     }
 
                     $cluster_href->{$clusterip}{"filesize_$k"}{total} += 1;
-                    $cluster_href->{$clusterip}{"filesize_$k"}{aqb}{total_kbs} += $downkbs_aqb;
-                    $cluster_href->{$clusterip}{"filesize_$k"}{org}{total_kbs} += $downkbs_org;
+                    $cluster_href->{$clusterip}{"filesize_$k"}{aqb}{total_speed} += $downspeed_aqb;
+                    $cluster_href->{$clusterip}{"filesize_$k"}{org}{total_speed} += $downspeed_org;
 
                     last;
                 }
@@ -117,12 +125,24 @@ sub compare_hit_url($)
     return 1;
 }
 
+sub log_url($$$)
+{
+    my ($client_ip, $roleip_org, $url) = @_;
+    my ($country, $province, $isp) = $ipos->query($client_ip);
+
+    if (($province eq "北京") && ($isp eq "联通")) {
+        printf("SLOWURL: %s %s %s\n", $client_ip, $roleip_org, $url);
+    }
+
+    return 1;
+}
+
 sub get_org_downspeed($$)
 {
     my ($url, $main_id) = @_;
 
     # select same stat_main_id
-    my $sql = qq/select url,role_id,stat_main_id,role_ip,down_speed_kbs,city_code,client_ip,down_size_bytes,monitor_time from speed_res_data_${date_g} where role_name like '%%_ip' and url='$url' and stat_main_id=$main_id/;
+    my $sql = qq/select url,role_id,stat_main_id,role_ip,down_time_s,city_code,client_ip,down_size_bytes,monitor_time from speed_res_data_${date_g} where role_name like '%%_ip' and url='$url' and stat_main_id=$main_id/;
 
     my $recs = $dbh->query($sql);
     if ($#$recs != -1) {
@@ -161,7 +181,7 @@ sub gen_speed_excel_data()
             printf($fp "%.2f\t%d\n", 
                 $cluster_href->{$k}{fast_cnt} * 100 / ($cluster_href->{$k}{fast_cnt} + $cluster_href->{$k}{slow_cnt}), $cluster_href->{$k}{hit_cnt});
         } else {
-            printf($fp "N/A\tN/A\n");
+            printf($fp "N/A\t%d\n", $cluster_href->{$k}{hit_cnt});
         }
     }
 
@@ -182,10 +202,12 @@ sub gen_client_excel_data()
             $slow_cnt += $cluster_href->{$k}{slowip}{$p};
         }
 
-        printf($fp "[%s %s %d]\n", $k, join(",", get_ipseg_pos($k)), $slow_cnt);
+        printf($fp "[%s %s %d %.2f%%]\n", $k, join(",", get_ipseg_pos($k)), 
+            $slow_cnt, $slow_cnt * 100 / $cluster_href->{$k}{hit_cnt}
+        );
 
         foreach my $p (sort {$cluster_href->{$k}{slowip}{$b} <=> $cluster_href->{$k}{slowip}{$a}} keys %{$cluster_href->{$k}{slowip}}) {
-            ($country, $province, $isp) = get_ipseg_pos($p);
+            ($country, $province, $isp) = $ipos->query($p);
             $cluster_href->{$k}{clipos}{"$province-$isp"} += $cluster_href->{$k}{slowip}{$p};
         }
 
