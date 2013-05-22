@@ -1,5 +1,10 @@
 #!/usr/bin/perl -w
 
+# INSERT DB
+#   speed_data_analysis
+#   cluster_cesu_daily
+#   cluster_cesu_hour
+
 use strict;
 use 5.010;
 use Speedy::Utils;
@@ -118,7 +123,7 @@ sub speed_data_analysis($)
     my $count = 0;
 
     # get all cesu role_id and sites
-    $sql = qq/select distinct(role_id),role_name from speed_monitor_data where monitor_time>="$date 00:00:00" and monitor_time<="$date 23:59:59" and role_name like "%_aqb" order by role_name/;
+    $sql = qq/select distinct(role_id),role_name from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.aqb_role_id and speed_task.type=1 and date(monitor_time)="$date" and role_name like "%_aqb" order by role_name/;
     $cesu_sites_aref = $dbh->query($sql);
 
     # 
@@ -132,7 +137,7 @@ sub speed_data_analysis($)
         ++$count;
 
         foreach my $key_city (sort keys %$city_code) {
-            $sql = qq/select role_id,role_name,role_ip,total_time,tcp_time,response_time,download_speed,monitor_time,dns_time,error_id from speed_monitor_data where monitor_time>="$date 00:00:00" and monitor_time<="$date 23:59:59" and role_name like "$site\_%" and city_code=$key_city order by monitor_time/;
+            $sql = qq/select role_id,role_name,role_ip,total_time,tcp_time,response_time,download_speed,monitor_time,dns_time,error_id from speed_monitor_data where date(monitor_time)="$date" and role_name like "${site}_%" and city_code=$key_city order by monitor_time/;
             my $site_city_aref = $dbh->query($sql);
 
             foreach my $key_clock (sort keys %$clock) {
@@ -225,10 +230,10 @@ sub cluster_cesu_daily($)
     my $sql = "";
     my $cluster_href = ();
     
-    $sql = qq/select count(*) as c from speed_data_analysis where time like "$date %" and total_rate!=0/;
+    $sql = qq/select count(*) as c from speed_data_analysis where date(time)="$date" and total_rate!=0/;
     my $total_cnt = $dbh->query_count($sql);
 
-    $sql = qq/select fun_ipseg(aqb_ip) as a, round(avg(total_rate),2), count(*) as c from speed_data_analysis where time like "$date %" and total_rate!=0 group by fun_ipseg(aqb_ip) order by c desc/;
+    $sql = qq/select fun_ipseg(aqb_ip) as a, round(avg(total_rate),2), count(*) as c from speed_data_analysis where date(time)="$date" and total_rate!=0 group by fun_ipseg(aqb_ip) order by c desc/;
     my $recs = $dbh->query($sql);
     for (my $i = 0; $i <= $#$recs; $i++) {
         $cluster_href = ();
@@ -242,7 +247,7 @@ sub cluster_cesu_daily($)
 
         # if speed rate too bad, need to analysis hours data
         if ($cluster_href->{count} > 10) { # || ($cluster_href->{total_rate} <= 0))) {
-            $sql = qq/select id from cluster_cesu_daily where ipseg="$cluster_href->{ipseg}" and time like "$date %"/;
+            $sql = qq/select id from cluster_cesu_daily where ipseg="$cluster_href->{ipseg}" and date(time)="$date"/;
             my $id = $dbh->query($sql);
             if (exists($id->[0][0])) {
                 cluster_cesu_hour($id->[0][0], $date, $cluster_href);
@@ -620,12 +625,13 @@ open($analysis_fp, ">/tmp/analysis_daily.txt");
 printf($analysis_fp "\n对比%s和%s的测速数据\n", $yesterday, $today);
 cesu_daily_log($yesterday, $today);
 
-cache_hit_log($today);
-
 printf($analysis_fp "\n### 机房性能变化 %s ~ %s ###\n", $yesterday, $today);
 compare_cluster($yesterday, $today);
 
 cluster_slow_log($yesterday, $today);
+
+cache_hit_log($yesterday);
+
 close($analysis_fp);
 $dbh->fini();
 

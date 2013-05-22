@@ -1,5 +1,9 @@
 #!/usr/bin/perl -w
 
+# INSERT DB
+#   cesu_daily
+#   site_cesu_daily
+
 use strict;
 use 5.010;
 use Speedy::AQB;
@@ -181,17 +185,17 @@ sub sort_db_speed(;$$)
     my $city_sql = "";
 
     # org
-    $sql = qq/select role_id, role_name, round(avg($keyword),4) as a from speed_monitor_data where role_name like "%_ip" and monitor_time >= "$date 00:00:00" and monitor_time <= "$date 23:59:59" and total_time != 0 and error_id=0 and role_ip!="0.0.0.0" $city_sql group by role_id having count(*) > 5 order by a/;
+    $sql = qq/select role_id, role_name, round(avg($keyword),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.ip_role_id and speed_task.type=1 and role_name like "%_ip" and date(monitor_time)="$date" and total_time!=0 and error_id=0 and role_ip!="0.0.0.0" $city_sql group by role_id having count(*) > 5 order by a/;
     printf("%s\n", $sql);
     fetch_data($dbh->query($sql), ORG);
 
     # aqb
-    $sql = qq/select role_id, role_name, round(avg($keyword),4) as a from speed_monitor_data where role_name like "%_aqb" and monitor_time >= "$date 00:00:00" and monitor_time <= "$date 23:59:59" and total_time != 0 and error_id=0 and role_ip!="0.0.0.0" $city_sql group by role_id having count(*) > 5 order by a/;
+    $sql = qq/select role_id, role_name, round(avg($keyword),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.aqb_role_id and speed_task.type=1 and role_name like "%_aqb" and date(monitor_time)="$date" and total_time!=0 and error_id=0 and role_ip!="0.0.0.0" $city_sql group by role_id having count(*) > 5 order by a/;
     printf("%s\n", $sql);
     fetch_data($dbh->query($sql), AQB);
 
     # dns
-    $sql = qq/select role_id, role_name, round(avg(dns_time),4) as a from speed_monitor_data where role_name like "%_aqb" and monitor_time > "$date 00:00:00" and monitor_time <= "$date 23:59:59" and total_time != 0 and error_id=0 and role_ip!="0.0.0.0" $city_sql group by role_id having count(*) > 5 order by a/;
+    $sql = qq/select role_id, role_name, round(avg(dns_time),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.aqb_role_id and speed_task.type=1 and role_name like "%_aqb" and date(monitor_time)="$date" and total_time!=0 and error_id=0 and role_ip!="0.0.0.0" $city_sql group by role_id having count(*) > 5 order by a/;
     printf("%s\n", $sql);
     fetch_data($dbh->query($sql), DNS);
 
