@@ -10,8 +10,8 @@ CREATE TABLE `cesu_daily` (
   `all_bigzero` float NOT NULL DEFAULT '0',
   `all_fastavg` float NOT NULL DEFAULT '0',
   `all_total` int(10) NOT NULL DEFAULT '0',
+  `type` varchar(32) DEFAULT NULL,
   `time` datetime NOT NULL,
-  `city` varchar(32) NOT NULL DEFAULT 'all',
   PRIMARY KEY (`id`),
   KEY `index_time` (`time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -21,6 +21,7 @@ CREATE TABLE `site_cesu_daily` (
   `site` varchar(500) NOT NULL,
   `rate` float NOT NULL DEFAULT '0',
   `cachehit` float NOT NULL DEFAULT '0',
+  `type` varchar(32) DEFAULT NULL,
   `time` datetime NOT NULL,
   PRIMARY KEY (`id`),
   KEY `index_time` (`time`)
@@ -104,6 +105,7 @@ CREATE TABLE `speed_task` (
   `type` tinyint(4) NOT NULL DEFAULT '0',
   `aqb_role_id` bigint(20) NOT NULL,
   `ip_role_id` bigint(20) NOT NULL,
+  `role_group` bigint(20) unsigned DEFAULT NULL,
   `site` varchar(500) DEFAULT NULL,
   `ip` varchar(100) DEFAULT NULL,
   `task_status` tinyint(4) NOT NULL DEFAULT '1',

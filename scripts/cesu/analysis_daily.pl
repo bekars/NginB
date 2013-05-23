@@ -25,6 +25,7 @@ $yesterday =~ tr/\n//d;
 
 my $dbh;
 my $do_db = 1;
+my $test_log = 0;
 
 my $analysis_fp;
 
@@ -539,11 +540,11 @@ use constant {
     CESU_DATE       => 7,
 };
 
-sub cesu_daily_log($$)
+sub cesu_daily_log($$$$)
 {
-    my ($yesterday, $today) = @_;
+    my ($yesterday, $today, $type, $fp) = @_;
 
-    my $sql = qq/select bigzero,fast,fastavg,slow,all_bigzero,all_fastavg,all_total,date(time) from cesu_daily where date(time)='$yesterday'/;
+    my $sql = qq/select bigzero,fast,fastavg,slow,all_bigzero,all_fastavg,all_total,date(time) from cesu_daily where type='$type' and date(time)='$yesterday'/;
     my $recs = $dbh->query($sql);
     my ($y_b, $y_f, $y_fa, $y_s, $y_ab, $y_af, $y_at, $y_d) = ( 
         $recs->[0][CESU_BIGZERO],
@@ -555,7 +556,7 @@ sub cesu_daily_log($$)
         $recs->[0][CESU_ALLTOTAL],
         $recs->[0][CESU_DATE]) if ($recs->[0]);
 
-    $sql = qq/select bigzero,fast,fastavg,slow,all_bigzero,all_fastavg,all_total,date(time) from cesu_daily where date(time)='$today'/;
+    $sql = qq/select bigzero,fast,fastavg,slow,all_bigzero,all_fastavg,all_total,date(time) from cesu_daily where type='$type' and date(time)='$today'/;
     $recs = $dbh->query($sql);
     my ($t_b, $t_f, $t_fa, $t_s, $t_ab, $t_af, $t_at, $t_d) = (
         $recs->[0][CESU_BIGZERO],
@@ -567,7 +568,7 @@ sub cesu_daily_log($$)
         $recs->[0][CESU_ALLTOTAL],
         $recs->[0][CESU_DATE]) if ($recs->[0]);
 
-    printf($analysis_fp "\n### 加速比 ###\n" .
+    printf($fp "\n### 加速比 ###\n" .
         "%s比源站快%%: %.2f%%\n" .
         "%s比源站快%%: %.2f%%\n", 
         $yesterday, $y_b, 
@@ -576,12 +577,12 @@ sub cesu_daily_log($$)
 
     my $delta = $t_b - $y_b;
     if ($delta > 0) {
-        printf($analysis_fp "加速提升: %.2f%%\n", $delta);
+        printf($fp "加速提升: %.2f%%\n", $delta);
     } else {
-        printf($analysis_fp "减速下降: %.2f%%\n", $delta);
+        printf($fp "减速下降: %.2f%%\n", $delta);
     }
 
-    printf($analysis_fp 
+    printf($fp 
         "\n%s详细数据 比源站快: %.2f%%; 快>10%%: %.2f%%; 平均加速幅度: %.2f%%; 慢<-10%%: %.2f%%; 所有测速站比源站快: %.2f%%; 所有测速站平均加速幅度: %.2f%%; 测速站总数: %d\n" .
         "%s详细数据 比源站快: %.2f%%; 快>10%%: %.2f%%; 平均加速幅度: %.2f%%; 慢<-10%%: %.2f%%; 所有测速站比源站快: %.2f%%; 所有测速站平均加速幅度: %.2f%%; 测速站总数: %d\n\n", 
         $yesterday, $y_b, $y_f, $y_fa, $y_s, $y_ab, $y_af, $y_at, 
@@ -616,14 +617,14 @@ $dbh = BMD::DBH->new(
     'dbport' => 3306
 );
 
-speed_data_analysis($today);
+speed_data_analysis($today) if not $test_log;
 
-cluster_cesu_daily($today);
+cluster_cesu_daily($today) if not $test_log;
 
 open($analysis_fp, ">/tmp/analysis_daily.txt");
 
 printf($analysis_fp "\n对比%s和%s的测速数据\n", $yesterday, $today);
-cesu_daily_log($yesterday, $today);
+cesu_daily_log($yesterday, $today, "cesu", $analysis_fp);
 
 printf($analysis_fp "\n### 机房性能变化 %s ~ %s ###\n", $yesterday, $today);
 compare_cluster($yesterday, $today);
@@ -633,6 +634,16 @@ cluster_slow_log($yesterday, $today);
 cache_hit_log($yesterday);
 
 close($analysis_fp);
+
+#
+# dnspod cesu data
+#
+open(my $dnspod_fp, ">/tmp/dnspod_daily.txt");
+printf($dnspod_fp "\n对比%s和%s的测速数据\n", $yesterday, $today);
+cesu_daily_log($yesterday, $today, "dnspod", $dnspod_fp);
+
+close($dnspod_fp);
+
 $dbh->fini();
 
 1;

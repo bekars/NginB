@@ -15,12 +15,13 @@ my @mail_addr = (
     'op@unlun.com',
     'ff@unlun.com',
     'jie.ma@unlun.com',
+    'yang.guo@unlun.com',
     'bekars@126.com',
 );
 
-sub send_mail($)
+sub send_mail($$$)
 {
-    my $to_addr     = shift;
+    my ($to_addr, $title, $filename) = @_;
     my $mail_user   = 'donotreply@anquanbao.com.cn';
     my $mail_pwd    = 'a45febb10cc82a0dce518b64d742a8f5';
     my $mail_server = 'anquanbao.com.cn';
@@ -28,10 +29,10 @@ sub send_mail($)
 
     my $from    = "From: yu.bai\@unlun.com\n";
     my $to      = "To: $to_addr\n";
-    my $subject = "[AQB测速分析] $today 测速监控数据\n\n";
+    my $subject = "[${title}测速daily] ${today} 测速监控数据\n\n";
 
     my $message = ""; 
-    open(my $fp, "</tmp/analysis_daily.txt");
+    open(my $fp, "<$filename");
     while (<$fp>) {
         $message .= $_;
     }
@@ -59,7 +60,8 @@ sub send_mail($)
 
 my $to_addr = join(', ', @mail_addr);
 say "send mail to $to_addr ...";
-send_mail($to_addr);
+send_mail($to_addr, "安全宝", "/tmp/analysis_daily.txt");
+send_mail($to_addr, "DNSPOD", "/tmp/dnspod_daily.txt");
 
 
 1;

@@ -13,15 +13,22 @@ use BMD::DBH;
 
 my $keyword = "total_time";
 my $date = `/bin/date -d "last day" +"%Y-%m-%d"`;#"2013-05-05";
+$date =~ tr/\n//d;
+
 
 my $site_rate_href = ();
 my $dbh;
 my $do_db = 1;
 
+my %cesu_type_h = (
+    'cesu'   => 1,
+    'dnspod' => 5,
+);
+
 # delete config cache=off site from cesu result
-sub speed_rate($)
+sub speed_rate($$)
 {
-    my $date = shift;
+    my ($date, $cesu_type) = @_;
     my $outf = "cesu_" . $date . ".txt";
     my %rate = (
         'TOTAL' => 0,
@@ -68,10 +75,11 @@ sub speed_rate($)
                 }
 
                 my $sdata = {
-                    site => $arr[1],
-                    rate => $arr[0],
+                    site     => $arr[1],
+                    rate     => $arr[0],
                     cachehit => 0,
-                    time => "$date 00:00:00",
+                    type     => $cesu_type,
+                    time     => "$date 00:00:00",
                 };
                 $dbh->insert('site_cesu_daily', $sdata) if $do_db;
             } else {
@@ -142,11 +150,13 @@ sub speed_rate($)
         all_bigzero => $rate{ALLBIGZ_RATE},
         all_fastavg => $rate{ALLFAST_AVG},
         all_total => $rate{ALL_TOTAL},
+        type => $cesu_type,
         time => "$date 00:00:00",
     };
     $dbh->insert('cesu_daily', $data) if $do_db;
 }
 
+=pod
 sub speed_rate_range()
 {
     my $tbegin = "";
@@ -168,34 +178,38 @@ sub speed_rate_range()
 
         $time = $tbegin . "~" . $tend;
         printf("### analysis $time ###\n");
-        speed_rate($time);
+        speed_rate($time, "cesu");
     }
 }
-
+=cut
 
 use constant {ORG=>0, AQB=>1, DNS=>2};
 
 #my $mysql_comm = 'mysql -h116.213.78.228 -ucesureadonly -p66ecf9c968132321a02e6e7aff34ce5d -P3306 -Dspeed -B -N -e ';
 #my $mysql_comm = 'mysql -h59.151.123.74 -ucesu_readonly -p\'Speed@)!@readonly\' -P3307 -Dspeed -B -N -e ';
 my $detail_href = {};
-sub sort_db_speed(;$$)
+sub sort_db_speed($$$)
 {
-    my ($keyword, $date) = @_;
+    my ($keyword, $date, $cesu_type) = @_;
     my $sql;
-    my $city_sql = "";
+    my $condition_sql = qq/total_time!=0 and error_id=0 and role_ip!="0.0.0.0"/;
+    my $time_sql = qq/monitor_time>="$date 00:00:00" and monitor_time<="$date 23:59:59"/;
+    my $group_sql = qq/role_id having count(*)>5 order by a/;
 
+    my $speed_type = $cesu_type_h{$cesu_type};
+    
     # org
-    $sql = qq/select role_id, role_name, round(avg($keyword),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.ip_role_id and speed_task.type=1 and role_name like "%_ip" and date(monitor_time)="$date" and total_time!=0 and error_id=0 and role_ip!="0.0.0.0" $city_sql group by role_id having count(*) > 5 order by a/;
+    $sql = qq/select role_id,role_name,round(avg($keyword),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.ip_role_id and speed_task.type=$speed_type and role_name like "%_ip" and $time_sql and $condition_sql group by $group_sql/;
     printf("%s\n", $sql);
     fetch_data($dbh->query($sql), ORG);
 
     # aqb
-    $sql = qq/select role_id, role_name, round(avg($keyword),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.aqb_role_id and speed_task.type=1 and role_name like "%_aqb" and date(monitor_time)="$date" and total_time!=0 and error_id=0 and role_ip!="0.0.0.0" $city_sql group by role_id having count(*) > 5 order by a/;
+    $sql = qq/select role_id,role_name,round(avg($keyword),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.aqb_role_id and speed_task.type=$speed_type and role_name like "%_aqb" and $time_sql and $condition_sql group by $group_sql/;
     printf("%s\n", $sql);
     fetch_data($dbh->query($sql), AQB);
 
     # dns
-    $sql = qq/select role_id, role_name, round(avg(dns_time),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.aqb_role_id and speed_task.type=1 and role_name like "%_aqb" and date(monitor_time)="$date" and total_time!=0 and error_id=0 and role_ip!="0.0.0.0" $city_sql group by role_id having count(*) > 5 order by a/;
+    $sql = qq/select role_id,role_name,round(avg(dns_time),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.aqb_role_id and speed_task.type=$speed_type and role_name like "%_aqb" and $time_sql and $condition_sql group by $group_sql/;
     printf("%s\n", $sql);
     fetch_data($dbh->query($sql), DNS);
 
@@ -280,11 +294,16 @@ $dbh = BMD::DBH->new(
     'dbport' => 3306
 );
 
-# analysis bonree cesu data
-sort_db_speed($keyword, $date);
+foreach my $k (sort {$cesu_type_h{$a} <=> $cesu_type_h{$b}} keys %cesu_type_h) 
+{
+    $site_rate_href = ();
 
-# calculata speed rate
-speed_rate($date);
+    # analysis cesu data
+    sort_db_speed($keyword, $date, $k);
+
+    # calculata speed rate
+    speed_rate($date, $k);
+}
 
 $dbh->fini();
 
