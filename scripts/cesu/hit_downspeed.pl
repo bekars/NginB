@@ -331,8 +331,11 @@ sub generate_pos_log($$)
         printf($fp "$k1:\n");
 
         my $p = $pos_href->{$k1};
-        foreach my $k2 (sort {$p->{$b}{total} <=> $p->{$a}{total}} keys %$p) {
+        foreach my $k2 (keys %$p) {
             $p->{$k2}{rate} = roundFloat($p->{$k2}{fast} * 100 / $p->{$k2}{total});
+        }
+
+        foreach my $k2 (sort {$p->{$b}{rate} <=> $p->{$a}{rate}} keys %$p) {
             
             printf($fp "\t%s\t%.2f%%\t%d\n", $k2, $p->{$k2}{rate}, $p->{$k2}{total});
 
@@ -369,10 +372,10 @@ sub view_hit_from_clients()
                 find_fast_pos($ip_cli, $ip_aqb, $ip_org, $isfast);
             }
 
-            last if ++$cnt > 1000;
+            #last if ++$cnt > 1000;
         }
         
-        last;
+        #last;
     }
 
 
