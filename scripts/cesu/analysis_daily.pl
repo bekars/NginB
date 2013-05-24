@@ -595,13 +595,17 @@ sub cesu_daily_log($$$$)
 sub cache_hit_log($)
 {
     my ($today) = @_;
-    my $sql = qq/select cachehit from cache_hit where date(time)="$today"/;
-    my $cachehit = $dbh->query_count($sql);
+    my $sql = qq/select cachehit,cacherate_flow,hit,hit_flow,total,total_flow from cache_hit where date(time)="$today"/;
+    my $recs = $dbh->query($sql);
+    my ($cachehit, $cacherate, $hit, $hit_flow, $total, $total_flow) = @{$recs->[0]};
 
-    $sql = qq/select cacherate_flow from cache_hit where date(time)="$today"/;
-    my $cacherate = $dbh->query_count($sql);
-
-    printf($analysis_fp "\n### 缓存命中率 %s ###\n缓存命中率: %.2f%%  缓存率: %.2f%%\n\n", $today, $cachehit, $cacherate);
+    printf($analysis_fp "\n### 缓存命中率 %s ###\n" .
+        "缓存命中率: %.2f%%, 缓存率: %.2f%%\n" .
+        "HIT总体命中率: %.2f%%, HIT总体缓存率: %.2f%%\n" .
+        "总日志数: %.2f亿, 总流量: %.2fG\n\n",
+        $today, $cachehit, $cacherate,
+        $hit * 100 / $total, $hit_flow * 100 / $total_flow,
+        $total / 100000000, $total_flow / 1024 / 1024 /1024);
 }
 
 #

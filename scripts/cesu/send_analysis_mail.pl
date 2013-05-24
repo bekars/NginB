@@ -61,6 +61,7 @@ sub send_mail($$$)
 my $to_addr = join(', ', @mail_addr);
 say "send mail to $to_addr ...";
 send_mail($to_addr, "安全宝", "/tmp/analysis_daily.txt");
+sleep(5);
 send_mail($to_addr, "DNSPOD", "/tmp/dnspod_daily.txt");
 
 
