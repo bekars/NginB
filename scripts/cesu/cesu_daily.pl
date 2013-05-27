@@ -157,32 +157,31 @@ sub speed_rate($$)
     $dbh->insert('cesu_daily', $data) if $do_db;
 }
 
-=pod
-sub speed_rate_range()
-{
-    my $tbegin = "";
-    my $tend = "";
-    my $time = "";
-    for (my $i=11; $i<=17; $i++) {
-        my $j = $i + 1;
-        if ($i > 9) {
-            $tbegin = "2013-04-$i";
-        } else {
-            $tbegin = "2013-04-0$i";
-        }
+#sub speed_rate_range()
+#{
+#    my $tbegin = "";
+#    my $tend = "";
+#    my $time = "";
+#    for (my $i=11; $i<=17; $i++) {
+#        my $j = $i + 1;
+#        if ($i > 9) {
+#            $tbegin = "2013-04-$i";
+#        } else {
+#            $tbegin = "2013-04-0$i";
+#        }
+#
+#        if ($j > 9) {
+#            $tend = "2013-04-$j";
+#        } else {
+#            $tend = "2013-04-0$j";
+#        }
+#
+#        $time = $tbegin . "~" . $tend;
+#        printf("### analysis $time ###\n");
+#        speed_rate($time, "cesu");
+#    }
+#}
 
-        if ($j > 9) {
-            $tend = "2013-04-$j";
-        } else {
-            $tend = "2013-04-0$j";
-        }
-
-        $time = $tbegin . "~" . $tend;
-        printf("### analysis $time ###\n");
-        speed_rate($time, "cesu");
-    }
-}
-=cut
 
 use constant {ORG=>0, AQB=>1, DNS=>2};
 
