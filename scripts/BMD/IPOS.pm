@@ -4,6 +4,8 @@ package BMD::IPOS;
 
 use strict;
 use BMD::DBH;
+use autodie;
+use Try::Tiny;
 
 my $dbh;
 
@@ -51,7 +53,7 @@ sub load($)
 
     printf("### load ip pos\n");
     if ($ipdb eq "db") {
-        $sql = "select id,ipstart,ipend,countryid,provinceid,ispid from ip";
+        $sql = qq/select id,ipstart,ipend,countryid,provinceid,ispid from ip/;
         $self->{ip_pos} = $self->{dbh}->query($sql);
     } else {
         open(my $ipfp, "<$ipdb") or die("ERR: can not open $ipdb!\n");
@@ -65,21 +67,21 @@ sub load($)
     }
 
     printf("### load country\n");
-    $sql = "select id,country from country";
+    $sql = qq/select id,country from country/;
     $recs = $self->{dbh}->query($sql);
     for (my $i = 0; $i <= $#$recs; $i++) {
         $self->{country}->{$recs->[$i][ID]} = $recs->[$i][VAL];
     }
     
     printf("### load province\n");
-    $sql = "select id,province from province";
+    $sql = qq/select id,province from province/;
     $recs = $self->{dbh}->query($sql);
     for (my $i = 0; $i <= $#$recs; $i++) {
         $self->{province}->{$recs->[$i][ID]} = $recs->[$i][VAL];
     }
  
     printf("### load isp\n");
-    $sql = "select id,isp from isp";
+    $sql = qq/select id,isp from isp/;
     $recs = $self->{dbh}->query($sql);
     for (my $i = 0; $i <= $#$recs; $i++) {
         $self->{isp}->{$recs->[$i][ID]} = $recs->[$i][VAL];
@@ -91,12 +93,16 @@ sub load($)
 
 my @ip_cache = ();
 
-# input ip address like 1.2.3.4
+# input ip address like 
+#   ip: 1.2.3.4
+#   ipseg: 1.2.3
 sub query($)
 {
     my $self = shift;
     my $ip = shift;
-    
+
+    $ip .= '.1' if (2 == ($ip =~ tr/././));
+
     my $ip_pos = $self->{ip_pos};
     my $country = $self->{country};
     my $province = $self->{province};
@@ -107,7 +113,7 @@ sub query($)
 
     for (my $j = 0; $j <= $#ip_cache; $j++) {
         if ($ip_cache[$j][0] == $ipnum) {
-            printf("### HIT ip cache\n");
+            #printf("### HIT ip cache\n");
             return ($ip_cache[$j][1], $ip_cache[$j][2], $ip_cache[$j][3]);
         }
     }
@@ -128,6 +134,12 @@ sub query($)
             $p_data = $province->{$ip_pos->[$i]->[PROVINCE]} if $ip_pos->[$i]->[PROVINCE];
             $i_data = $isp->{$ip_pos->[$i]->[ISP]} if $ip_pos->[$i]->[ISP];
             $i_data = "UFO" if $i_data eq "";
+
+            if (($ipnum >= 1778515968) && ($ipnum <= 1778647039)) {
+                $c_data = $country->{2};
+                $p_data = $province->{4};
+                $i_data = "UFO";
+            }
 
             my @c = ($ipnum, $c_data, $p_data, $i_data);
             push(@ip_cache, \@c);
@@ -162,6 +174,14 @@ sub get_isp_byid($)
     my $self = shift;
     my $id = shift;
     return $self->{isp}->{$id};
+}
+
+sub BEGIN
+{
+}
+
+sub DESTROY
+{
 }
 
 1;

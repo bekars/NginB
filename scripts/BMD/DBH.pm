@@ -4,6 +4,8 @@ package BMD::DBH;
 
 use strict;
 use DBI;
+use autodie;
+use Try::Tiny;
 
 my $dbh;
 
@@ -61,7 +63,11 @@ sub query_count($)
 {
     my $self = shift;
     my $sql = shift;
-    return _query($sql)->[0][0];
+    try {
+        return _query($sql)->[0][0];
+    } catch {
+        return -1;
+    }
 }
 
 sub _dosql($)
@@ -111,6 +117,14 @@ sub fini()
 {
     my $self = shift;
     $self->{dbh}->disconnect();
+}
+
+sub BEGIN
+{
+}
+
+sub DESTROY
+{
 }
 
 1;
