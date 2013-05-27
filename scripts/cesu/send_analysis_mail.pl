@@ -9,6 +9,7 @@ use MIME::Base64;
 use Encode;
 
 my $today = `/bin/date +"%Y-%m-%d"`;
+#$today = "2013-05-26";
 
 my @mail_addr = (
     'fast@unlun.com',
@@ -16,12 +17,15 @@ my @mail_addr = (
     'ff@unlun.com',
     'jie.ma@unlun.com',
     'yang.guo@unlun.com',
+);
+
+my @mail_my = (
     'bekars@126.com',
 );
 
-sub send_mail($$$)
+sub send_mail($$$$)
 {
-    my ($to_addr, $title, $filename) = @_;
+    my ($to_addr, $title, $filename, $to_arr) = @_;
     my $mail_user   = 'donotreply@anquanbao.com.cn';
     my $mail_pwd    = 'a45febb10cc82a0dce518b64d742a8f5';
     my $mail_server = 'anquanbao.com.cn';
@@ -29,7 +33,7 @@ sub send_mail($$$)
 
     my $from    = "From: yu.bai\@unlun.com\n";
     my $to      = "To: $to_addr\n";
-    my $subject = "[${title}测速daily] ${today} 测速监控数据\n\n";
+    my $subject = "[${title}测速] ${today} ${title}测速监控数据\n\n";
 
     my $message = ""; 
     open(my $fp, "<$filename");
@@ -42,7 +46,7 @@ sub send_mail($$$)
 
     $smtp->auth($mail_user, $mail_pwd) || die "Auth Error! $!";
     $smtp->mail($mail_from);
-    foreach my $mto (@mail_addr) {
+    foreach my $mto (@$to_arr) {
         $smtp->to($mto);
     }
 
@@ -57,12 +61,19 @@ sub send_mail($$$)
     $smtp->quit();
 }
 
+my $to_addr;
 
-my $to_addr = join(', ', @mail_addr);
+$to_addr = join(', ', @mail_addr);
 say "send mail to $to_addr ...";
-send_mail($to_addr, "安全宝", "/tmp/analysis_daily.txt");
+send_mail($to_addr, "安全宝", "/tmp/analysis_daily.txt", \@mail_addr);
 sleep(5);
-send_mail($to_addr, "DNSPOD", "/tmp/dnspod_daily.txt");
+send_mail($to_addr, "DNSPOD", "/tmp/dnspod_daily.txt", \@mail_addr);
+
+$to_addr = join(', ', @mail_my);
+say "send mail to $to_addr ...";
+send_mail($to_addr, "安全宝", "/tmp/analysis_daily.txt", \@mail_my);
+sleep(5);
+send_mail($to_addr, "DNSPOD", "/tmp/dnspod_daily.txt", \@mail_my);
 
 
 1;

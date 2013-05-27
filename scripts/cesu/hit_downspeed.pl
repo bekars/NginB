@@ -266,19 +266,20 @@ sub find_fast_pos($$$$)
     my ($c_aqb, $p_aqb, $i_aqb) = $ipos->query($ip_aqb);
     my ($c_org, $p_org, $i_org) = $ipos->query($ip_org);
 
+    my $ipseg_cli = ipseg($ip_cli);
     my $ipseg_aqb = ipseg($ip_aqb);
     my $ipseg_org = ipseg($ip_org);
 
     if ($isfast) {
-        $pos_c_a_href->{"${p_cli}-${i_cli}"}{"${p_aqb}-${i_aqb}-${ipseg_aqb}"}{fast} += 1; 
-        $pos_c_o_href->{"${p_cli}-${i_cli}"}{"${p_org}-${i_org}-${ipseg_org}"}{slow} += 1; 
+        $pos_c_a_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{"${p_aqb}-${i_aqb}-${ipseg_aqb}"}{fast} += 1; 
+        $pos_c_o_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{"${p_org}-${i_org}-${ipseg_org}"}{slow} += 1; 
     } else {
-        $pos_c_a_href->{"${p_cli}-${i_cli}"}{"${p_aqb}-${i_aqb}-${ipseg_aqb}"}{slow} += 1; 
-        $pos_c_a_href->{"${p_cli}-${i_cli}"}{"${p_aqb}-${i_aqb}-${ipseg_aqb}"}{org}{"${p_org}-${i_org}-${ipseg_org}"}{total} += 1; 
-        $pos_c_o_href->{"${p_cli}-${i_cli}"}{"${p_org}-${i_org}-${ipseg_org}"}{fast} += 1; 
+        $pos_c_a_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{"${p_aqb}-${i_aqb}-${ipseg_aqb}"}{slow} += 1; 
+        $pos_c_a_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{"${p_aqb}-${i_aqb}-${ipseg_aqb}"}{org}{"${p_org}-${i_org}-${ipseg_org}"}{total} += 1; 
+        $pos_c_o_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{"${p_org}-${i_org}-${ipseg_org}"}{fast} += 1; 
     }
-    $pos_c_a_href->{"${p_cli}-${i_cli}"}{"${p_aqb}-${i_aqb}-${ipseg_aqb}"}{total} += 1; 
-    $pos_c_o_href->{"${p_cli}-${i_cli}"}{"${p_org}-${i_org}-${ipseg_org}"}{total} += 1; 
+    $pos_c_a_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{"${p_aqb}-${i_aqb}-${ipseg_aqb}"}{total} += 1; 
+    $pos_c_o_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{"${p_org}-${i_org}-${ipseg_org}"}{total} += 1; 
 
     return 1;
 }
@@ -341,7 +342,7 @@ sub generate_pos_log($$)
 
             my $q = $p->{$k2}{org};
             foreach my $k3 (sort {$q->{$b}{total} <=> $q->{$a}{total}} keys %$q) {
-                printf($fp "\t\t%s\t%d\n", $k3, $q->{$k3}{total});
+                printf($fp "\t\t\t\t%s\t%d\n", $k3, $q->{$k3}{total});
             }
         }
     }
@@ -372,10 +373,10 @@ sub view_hit_from_clients()
                 find_fast_pos($ip_cli, $ip_aqb, $ip_org, $isfast);
             }
 
-            #last if ++$cnt > 1000;
+            last if ++$cnt > 1000;
         }
         
-        #last;
+        last;
     }
 
 

@@ -20,8 +20,8 @@ my $yesterday = `/bin/date -d "-2 day" +"%Y-%m-%d"`;
 $today     =~ tr/\n//d;
 $yesterday =~ tr/\n//d;
 
-#$yesterday = "2013-05-07";
-#$today     = "2013-05-08";
+#$yesterday = "2013-05-24";
+#$today     = "2013-05-25";
 
 my $dbh;
 my $do_db = 1;
@@ -534,35 +534,43 @@ use constant {
     CESU_FAST       => 1,
     CESU_FASTAVG    => 2,
     CESU_SLOW       => 3,
-    CESU_ALLBIGZERO => 4,
-    CESU_ALLFASTAVG => 5,
-    CESU_ALLTOTAL   => 6,
-    CESU_DATE       => 7,
+    CESU_SLOWAVG    => 4,
+    CESU_TOTAL      => 5,
+    CESU_ALLBIGZERO => 6,
+    CESU_ALLFASTAVG => 7,
+    CESU_ALLTOTAL   => 8,
+    CESU_DATE       => 9,
 };
 
 sub cesu_daily_log($$$$)
 {
     my ($yesterday, $today, $type, $fp) = @_;
 
-    my $sql = qq/select bigzero,fast,fastavg,slow,all_bigzero,all_fastavg,all_total,date(time) from cesu_daily where type='$type' and date(time)='$yesterday'/;
+    my $sql_tmpl = qq/select bigzero,fast,fastavg,slow,slowavg,total,all_bigzero,all_fastavg,all_total,date(time) from cesu_daily where type='%s' and date(time)='%s'/;
+
+    my $sql = sprintf($sql_tmpl, $type, $yesterday);
     my $recs = $dbh->query($sql);
-    my ($y_b, $y_f, $y_fa, $y_s, $y_ab, $y_af, $y_at, $y_d) = ( 
+    my ($y_b, $y_f, $y_fa, $y_s, $y_sa, $y_t, $y_ab, $y_af, $y_at, $y_d) = ( 
         $recs->[0][CESU_BIGZERO],
         $recs->[0][CESU_FAST],
         $recs->[0][CESU_FASTAVG],
         $recs->[0][CESU_SLOW],
+        $recs->[0][CESU_SLOWAVG],
+        $recs->[0][CESU_TOTAL],
         $recs->[0][CESU_ALLBIGZERO],
         $recs->[0][CESU_ALLFASTAVG],
         $recs->[0][CESU_ALLTOTAL],
         $recs->[0][CESU_DATE]) if ($recs->[0]);
 
-    $sql = qq/select bigzero,fast,fastavg,slow,all_bigzero,all_fastavg,all_total,date(time) from cesu_daily where type='$type' and date(time)='$today'/;
+    $sql = sprintf($sql_tmpl, $type, $today);
     $recs = $dbh->query($sql);
-    my ($t_b, $t_f, $t_fa, $t_s, $t_ab, $t_af, $t_at, $t_d) = (
+    my ($t_b, $t_f, $t_fa, $t_s, $t_sa, $t_t, $t_ab, $t_af, $t_at, $t_d) = (
         $recs->[0][CESU_BIGZERO],
         $recs->[0][CESU_FAST],
         $recs->[0][CESU_FASTAVG],
         $recs->[0][CESU_SLOW],
+        $recs->[0][CESU_SLOWAVG],
+        $recs->[0][CESU_TOTAL],
         $recs->[0][CESU_ALLBIGZERO],
         $recs->[0][CESU_ALLFASTAVG],
         $recs->[0][CESU_ALLTOTAL],
@@ -583,10 +591,10 @@ sub cesu_daily_log($$$$)
     }
 
     printf($fp 
-        "\n%s详细数据 比源站快: %.2f%%; 快>10%%: %.2f%%; 平均加速幅度: %.2f%%; 慢<-10%%: %.2f%%; 所有测速站比源站快: %.2f%%; 所有测速站平均加速幅度: %.2f%%; 测速站总数: %d\n" .
-        "%s详细数据 比源站快: %.2f%%; 快>10%%: %.2f%%; 平均加速幅度: %.2f%%; 慢<-10%%: %.2f%%; 所有测速站比源站快: %.2f%%; 所有测速站平均加速幅度: %.2f%%; 测速站总数: %d\n\n", 
-        $yesterday, $y_b, $y_f, $y_fa, $y_s, $y_ab, $y_af, $y_at, 
-        $today, $t_b, $t_f, $t_fa, $t_s, $t_ab, $t_af, $t_at,
+        "\n[%s详细数据]\n符合测速条件共%d站: 比源站快: %.2f%%; 快>10%%: %.2f%%; 平均加速幅度: %.2f%%; 慢<-10%%: %.2f%%; 平均减速幅度：%.2f%%;\n总共测速%d站: 比源站快: %.2f%%; 平均加速幅度: %.2f%%\n" .
+        "\n[%s详细数据]\n符合测速条件共%d站: 比源站快: %.2f%%; 快>10%%: %.2f%%; 平均加速幅度: %.2f%%; 慢<-10%%: %.2f%%; 平均减速幅度：%.2f%%;\n总共测速%d站: 比源站快: %.2f%%; 平均加速幅度: %.2f%%\n\n",
+        $yesterday, $y_t, $y_b, $y_f, $y_fa, $y_s, $y_sa, $y_at, $y_ab, $y_af,
+        $today, $t_t, $t_b, $t_f, $t_fa, $t_s, $t_sa, $t_at, $t_ab, $t_af,
     );
 
     return 1;

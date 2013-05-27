@@ -118,6 +118,10 @@ CREATE TABLE `speed_task` (
   KEY `index_ip_role_id` (`ip_role_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
+CREATE TABLE `speed_task_type` (
+  `type` tinyint(4) NOT NULL,
+  `name` varchar(32) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 delimiter //
