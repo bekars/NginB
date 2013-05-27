@@ -6,6 +6,7 @@ use strict;
 use BMD::DBH;
 use autodie;
 use Try::Tiny;
+use Data::Dumper;
 
 my $dbh;
 
@@ -16,17 +17,6 @@ sub new()
     my $self = {
         @_,
     };
-
-    $dbh = BMD::DBH->new(
-        'dbhost' => '116.213.78.197',
-        'dbuser' => 'readonly',
-        'dbpass' => 'anQuanba0sp11d',
-        'dbname' => 'ip',
-        'dbport' => 3306
-    );
-    
-    $self->{dbh} = $dbh;
-    $self->{dbh}->execute("set names utf8");
 
     bless($self, $class);
     return $self;
@@ -51,12 +41,25 @@ sub load($)
     my $recs;
     my $sql;
 
+    if ($ipdb eq "db") {
+        $dbh = BMD::DBH->new(
+            'dbhost' => '116.213.78.197',
+            'dbuser' => 'readonly',
+            'dbpass' => 'anQuanba0sp11d',
+            'dbname' => 'ip',
+            'dbport' => 3306
+        );
+
+        $self->{dbh} = $dbh;
+        $self->{dbh}->execute("set names utf8");
+    }
+
     printf("### load ip pos\n");
     if ($ipdb eq "db") {
         $sql = qq/select id,ipstart,ipend,countryid,provinceid,ispid from ip/;
         $self->{ip_pos} = $self->{dbh}->query($sql);
     } else {
-        open(my $ipfp, "<$ipdb") or die("ERR: can not open $ipdb!\n");
+        open(my $ipfp, "<$ipdb/ip.db") or die("ERR: can not open $ipdb/ip.db!\n");
         while (<$ipfp>) {
             $_ =~ m/^(.*?)\t(.*?)\t(.*?)\t(.*?)\t(.*?)\t(.*?)\n$/;
             my @rec_data = ($1, $2, $3, $4, $5, $6);
@@ -67,27 +70,57 @@ sub load($)
     }
 
     printf("### load country\n");
-    $sql = qq/select id,country from country/;
-    $recs = $self->{dbh}->query($sql);
-    for (my $i = 0; $i <= $#$recs; $i++) {
-        $self->{country}->{$recs->[$i][ID]} = $recs->[$i][VAL];
-    }
-    
-    printf("### load province\n");
-    $sql = qq/select id,province from province/;
-    $recs = $self->{dbh}->query($sql);
-    for (my $i = 0; $i <= $#$recs; $i++) {
-        $self->{province}->{$recs->[$i][ID]} = $recs->[$i][VAL];
-    }
- 
-    printf("### load isp\n");
-    $sql = qq/select id,isp from isp/;
-    $recs = $self->{dbh}->query($sql);
-    for (my $i = 0; $i <= $#$recs; $i++) {
-        $self->{isp}->{$recs->[$i][ID]} = $recs->[$i][VAL];
+    if ($ipdb eq "db") {
+        $sql = qq/select id,country from country/;
+        $recs = $self->{dbh}->query($sql);
+        for (my $i = 0; $i <= $#$recs; $i++) {
+            $self->{country}->{$recs->[$i][ID]} = $recs->[$i][VAL];
+        }
+    } else {
+        open(my $cfp, "<$ipdb/country.db") or die("ERR: can not open $ipdb/country.db!\n");
+        while (<$cfp>) {
+            $_ =~ m/^(.*?)\t(.*?)\n$/;
+            $self->{country}->{$1} = $2;
+        }
+        close($cfp);
     }
 
-    $self->{dbh}->fini();
+    printf("### load province\n");
+    if ($ipdb eq "db") {
+        $sql = qq/select id,province from province/;
+        $recs = $self->{dbh}->query($sql);
+        for (my $i = 0; $i <= $#$recs; $i++) {
+            $self->{province}->{$recs->[$i][ID]} = $recs->[$i][VAL];
+        }
+    } else {
+        open(my $pfp, "<$ipdb/province.db") or die("ERR: can not open $ipdb/province.db!\n");
+        while (<$pfp>) {
+            $_ =~ m/^(.*?)\t(.*?)\n$/;
+            $self->{province}->{$1} = $2;
+        }
+        close($pfp);
+    }
+
+    printf("### load isp\n");
+    if ($ipdb eq "db") {
+        $sql = qq/select id,isp from isp/;
+        $recs = $self->{dbh}->query($sql);
+        for (my $i = 0; $i <= $#$recs; $i++) {
+            $self->{isp}->{$recs->[$i][ID]} = $recs->[$i][VAL];
+        }
+    } else {
+        open(my $ifp, "<$ipdb/isp.db") or die("ERR: can not open $ipdb/isp.db!\n");
+        while (<$ifp>) {
+            $_ =~ m/^(.*?)\t(.*?)\n$/;
+            $self->{isp}->{$1} = $2;
+        }
+        close($ifp);
+    }
+
+    if ($ipdb eq "db") {
+        $self->{dbh}->fini();
+    }
+
     return 1;
 }
 
@@ -130,6 +163,7 @@ sub query($)
             my $p_data = "UFO";
             my $i_data = "UFO";
 
+            printf("### $ip $ipnum $ip_pos->[$i]->[COUNTRY] $ip_pos->[$i]->[PROVINCE] $ip_pos->[$i]->[ISP]\n");
             $c_data = $country->{$ip_pos->[$i]->[COUNTRY]} if $ip_pos->[$i]->[COUNTRY];
             $p_data = $province->{$ip_pos->[$i]->[PROVINCE]} if $ip_pos->[$i]->[PROVINCE];
             $i_data = $isp->{$ip_pos->[$i]->[ISP]} if $ip_pos->[$i]->[ISP];
