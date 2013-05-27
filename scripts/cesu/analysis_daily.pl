@@ -11,6 +11,8 @@ use Speedy::Utils;
 use Data::Dumper;
 use BMD::DBH;
 use Time::Interval;
+use Getopt::Long;
+use Smart::Comments;
 
 my $keyword = "total_time";
 
@@ -24,8 +26,8 @@ $yesterday =~ tr/\n//d;
 #$today     = "2013-05-25";
 
 my $dbh;
-my $do_db = 1;
-my $test_log = 0;
+my $do_db = 0;
+my $do_analysis = 0;
 
 my $analysis_fp;
 
@@ -124,7 +126,7 @@ sub speed_data_analysis($)
     my $count = 0;
 
     # get all cesu role_id and sites
-    $sql = qq/select distinct(role_id),role_name from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.aqb_role_id and speed_task.type=1 and date(monitor_time)="$date" and role_name like "%_aqb" order by role_name/;
+    $sql = qq/select distinct(role_id),role_name from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.aqb_role_id and speed_task.cesu=1 and date(monitor_time)="$date" and role_name like "%_aqb" order by role_name/;
     $cesu_sites_aref = $dbh->query($sql);
 
     # 
@@ -619,6 +621,12 @@ sub cache_hit_log($)
 #
 # begin to run
 #
+
+GetOptions(
+    'do_db|d+' => \$do_db,
+    'do_analysis|a+' => \$do_analysis,
+);
+
 $dbh = BMD::DBH->new(
     'dbhost' => '116.213.78.228',
     'dbuser' => 'cesutest',
@@ -629,9 +637,9 @@ $dbh = BMD::DBH->new(
     'dbport' => 3306
 );
 
-speed_data_analysis($today) if not $test_log;
+speed_data_analysis($today) if $do_analysis;
 
-cluster_cesu_daily($today) if not $test_log;
+cluster_cesu_daily($today) if $do_analysis;
 
 open($analysis_fp, ">/tmp/analysis_daily.txt");
 

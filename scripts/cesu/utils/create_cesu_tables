@@ -105,9 +105,10 @@ CREATE TABLE `speed_task` (
   `type` tinyint(4) NOT NULL DEFAULT '0',
   `aqb_role_id` bigint(20) NOT NULL,
   `ip_role_id` bigint(20) NOT NULL,
-  `role_group` bigint(20) unsigned DEFAULT NULL,
   `site` varchar(500) DEFAULT NULL,
   `ip` varchar(100) DEFAULT NULL,
+  `cesu` tinyint(2) unsigned DEFAULT NULL,
+  `dnspod` tinyint(2) unsigned DEFAULT NULL,
   `task_status` tinyint(4) NOT NULL DEFAULT '1',
   `role_status` tinyint(4) NOT NULL DEFAULT '0',
   `enable_flag` tinyint(4) NOT NULL DEFAULT '1',
@@ -115,8 +116,9 @@ CREATE TABLE `speed_task` (
   `time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `index_aqb_role_id` (`aqb_role_id`),
-  KEY `index_ip_role_id` (`ip_role_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+  KEY `index_ip_role_id` (`ip_role_id`),
+  KEY `index_site` (`site`(255))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8
 
 CREATE TABLE `speed_task_type` (
   `type` tinyint(4) NOT NULL,

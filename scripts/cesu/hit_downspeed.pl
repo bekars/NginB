@@ -373,10 +373,10 @@ sub view_hit_from_clients()
                 find_fast_pos($ip_cli, $ip_aqb, $ip_org, $isfast);
             }
 
-            last if ++$cnt > 1000;
+            #last if ++$cnt > 50;
         }
         
-        last;
+        #last;
     }
 
 
@@ -393,7 +393,7 @@ sub view_hit_from_clients()
 # main start
 #
 $ipos = BMD::IPOS->new();
-$ipos->load("/opt/ip_pos.db");
+$ipos->load("/opt/");
 
 $dbh = BMD::DBH->new(
     'dbhost' => '116.213.78.228',

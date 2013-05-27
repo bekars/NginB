@@ -10,6 +10,8 @@ use Speedy::AQB;
 use Speedy::Utils;
 use Data::Dumper;
 use BMD::DBH;
+use Getopt::Long;
+use Smart::Comments;
 
 my $keyword = "total_time";
 my $date = `/bin/date -d "last day" +"%Y-%m-%d"`;#"2013-05-05";
@@ -19,7 +21,7 @@ $date =~ tr/\n//d;
 my $site_rate_href = ();
 my $detail_href = ();
 my $dbh;
-my $do_db = 1;
+my $do_db = 0;
 
 my %cesu_type_h = (
     'cesu'   => 1,
@@ -196,20 +198,18 @@ sub sort_db_speed($$$)
     my $time_sql = qq/monitor_time>="$date 00:00:00" and monitor_time<="$date 23:59:59"/;
     my $group_sql = qq/role_id having count(*)>5 order by a/;
 
-    my $speed_type = $cesu_type_h{$cesu_type};
-    
     # org
-    $sql = qq/select role_id,role_name,round(avg($keyword),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.ip_role_id and speed_task.type=$speed_type and role_name like "%_ip" and $time_sql and $condition_sql group by $group_sql/;
+    $sql = qq/select role_id,role_name,round(avg($keyword),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.ip_role_id and speed_task.$cesu_type=1 and role_name like "%_ip" and $time_sql and $condition_sql group by $group_sql/;
     printf("%s\n", $sql);
     fetch_data($dbh->query($sql), ORG);
 
     # aqb
-    $sql = qq/select role_id,role_name,round(avg($keyword),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.aqb_role_id and speed_task.type=$speed_type and role_name like "%_aqb" and $time_sql and $condition_sql group by $group_sql/;
+    $sql = qq/select role_id,role_name,round(avg($keyword),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.aqb_role_id and speed_task.$cesu_type=1 and role_name like "%_aqb" and $time_sql and $condition_sql group by $group_sql/;
     printf("%s\n", $sql);
     fetch_data($dbh->query($sql), AQB);
 
     # dns
-    $sql = qq/select role_id,role_name,round(avg(dns_time),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.aqb_role_id and speed_task.type=$speed_type and role_name like "%_aqb" and $time_sql and $condition_sql group by $group_sql/;
+    $sql = qq/select role_id,role_name,round(avg(dns_time),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.aqb_role_id and speed_task.$cesu_type=1 and role_name like "%_aqb" and $time_sql and $condition_sql group by $group_sql/;
     printf("%s\n", $sql);
     fetch_data($dbh->query($sql), DNS);
 
@@ -284,6 +284,10 @@ sub get_site_name($)
 #
 # begin to run
 #
+
+GetOptions(
+    'do_db|d+' => \$do_db,
+);
 
 $dbh = BMD::DBH->new(
     'dbhost' => '116.213.78.228',
