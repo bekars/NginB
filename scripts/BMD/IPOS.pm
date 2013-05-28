@@ -9,6 +9,7 @@ use Try::Tiny;
 use Data::Dumper;
 
 my $dbh;
+my $debug = 0;
 
 sub new()
 {
@@ -54,7 +55,7 @@ sub load($)
         $self->{dbh}->execute("set names utf8");
     }
 
-    printf("### load ip pos\n");
+    printf("### load ip pos\n") if $debug;
     if ($ipdb eq "db") {
         $sql = qq/select id,ipstart,ipend,countryid,provinceid,ispid from ip/;
         $self->{ip_pos} = $self->{dbh}->query($sql);
@@ -69,7 +70,7 @@ sub load($)
         $self->{ip_pos} = \@rec_a;
     }
 
-    printf("### load country\n");
+    printf("### load country\n") if $debug;
     if ($ipdb eq "db") {
         $sql = qq/select id,country from country/;
         $recs = $self->{dbh}->query($sql);
@@ -85,7 +86,7 @@ sub load($)
         close($cfp);
     }
 
-    printf("### load province\n");
+    printf("### load province\n") if $debug;
     if ($ipdb eq "db") {
         $sql = qq/select id,province from province/;
         $recs = $self->{dbh}->query($sql);
@@ -101,7 +102,7 @@ sub load($)
         close($pfp);
     }
 
-    printf("### load isp\n");
+    printf("### load isp\n") if $debug;
     if ($ipdb eq "db") {
         $sql = qq/select id,isp from isp/;
         $recs = $self->{dbh}->query($sql);
@@ -146,7 +147,7 @@ sub query($)
 
     for (my $j = 0; $j <= $#ip_cache; $j++) {
         if ($ip_cache[$j][0] == $ipnum) {
-            #printf("### HIT ip cache\n");
+            #printf("### HIT ip cache\n") if $debug;
             return ($ip_cache[$j][1], $ip_cache[$j][2], $ip_cache[$j][3]);
         }
     }
@@ -163,7 +164,7 @@ sub query($)
             my $p_data = "UFO";
             my $i_data = "UFO";
 
-            printf("### $ip $ipnum $ip_pos->[$i]->[COUNTRY] $ip_pos->[$i]->[PROVINCE] $ip_pos->[$i]->[ISP]\n");
+            #printf("### $ip $ipnum $ip_pos->[$i]->[COUNTRY] $ip_pos->[$i]->[PROVINCE] $ip_pos->[$i]->[ISP]\n") if $debug;
             $c_data = $country->{$ip_pos->[$i]->[COUNTRY]} if $ip_pos->[$i]->[COUNTRY];
             $p_data = $province->{$ip_pos->[$i]->[PROVINCE]} if $ip_pos->[$i]->[PROVINCE];
             $i_data = $isp->{$ip_pos->[$i]->[ISP]} if $ip_pos->[$i]->[ISP];
