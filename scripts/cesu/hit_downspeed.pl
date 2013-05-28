@@ -10,10 +10,11 @@ use BMD::IPOS;
 use Time::Interval;
 use autodie;
 use Try::Tiny;
+use IO::Handle;
 
 my $keyword = "total_time";
 
-my $today   = `date -d "-1 day" +"%Y-%m-%d"`;
+my $today   = `/bin/date -d "-1 day" +"%Y-%m-%d"`;
 $today      =~ tr/\n//d;
 
 my $date_g = "20130523";
@@ -57,7 +58,7 @@ use constant {
 # find all have HIT url cluster
 sub list_hit_clusters()
 {
-    my $sqlplus = qq//;
+    my $sqlplus = qq/and down_time_s>0.01/;
 
     # find hit clusters
     my $sql = qq/select fun_ipseg(role_ip),count(*) as c from speed_res_data_${date_g} where role_name like "%%_aqb" and header like "%%X-Powered-By-Anquanbao: HIT %%" and fun_ipseg(role_ip)!='0.0.0' $sqlplus group by fun_ipseg(role_ip) order by c desc/;
@@ -270,6 +271,8 @@ sub find_fast_pos($$$$)
     my $ipseg_aqb = ipseg($ip_aqb);
     my $ipseg_org = ipseg($ip_org);
 
+    $ipseg_cli = "";
+
     if ($isfast) {
         $pos_c_a_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{"${p_aqb}-${i_aqb}-${ipseg_aqb}"}{fast} += 1; 
         $pos_c_o_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{"${p_org}-${i_org}-${ipseg_org}"}{slow} += 1; 
@@ -280,6 +283,9 @@ sub find_fast_pos($$$$)
     }
     $pos_c_a_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{"${p_aqb}-${i_aqb}-${ipseg_aqb}"}{total} += 1; 
     $pos_c_o_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{"${p_org}-${i_org}-${ipseg_org}"}{total} += 1; 
+
+    $pos_c_a_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{total} += 1;
+    $pos_c_o_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{total} += 1;
 
     return 1;
 }
@@ -329,7 +335,7 @@ sub generate_pos_log($$)
 
     foreach my $k1 (keys %$pos_href) {
 
-        printf($fp "$k1:\n");
+        printf($fp "$k1\t$pos_href->{$k1}{total}\n");
 
         my $p = $pos_href->{$k1};
         foreach my $k2 (keys %$p) {
@@ -340,9 +346,11 @@ sub generate_pos_log($$)
             
             printf($fp "\t%s\t%.2f%%\t%d\n", $k2, $p->{$k2}{rate}, $p->{$k2}{total});
 
-            my $q = $p->{$k2}{org};
-            foreach my $k3 (sort {$q->{$b}{total} <=> $q->{$a}{total}} keys %$q) {
-                printf($fp "\t\t\t\t%s\t%d\n", $k3, $q->{$k3}{total});
+            if (exists($p->{$k2}{org})) {
+                my $q = $p->{$k2}{org};
+                foreach my $k3 (sort {$q->{$b}{total} <=> $q->{$a}{total}} keys %$q) {
+                    printf($fp "\t\t\t\t%s\t%d\n", $k3, $q->{$k3}{total});
+                }
             }
         }
     }
@@ -376,7 +384,7 @@ sub view_hit_from_clients()
             #last if ++$cnt > 50;
         }
         
-        #last;
+        last if ($client_href->{$kip}{hit_cnt}<1000);
     }
 
 
