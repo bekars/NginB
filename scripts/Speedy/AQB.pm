@@ -101,7 +101,7 @@ sub getScheduleInfo($)
         return;
     }
 
-    my $sql = sprintf("select id,name,ipaddr,ipalias from schedulemap,clusters where id=clusterid and siteid=%d;", $siteid);
+    my $sql = qq/select id,name,ipaddr,ipalias from schedulemap,clusters where id=clusterid and siteid=$siteid/;
     my $recs = runSQL($sql);
 
     #printf("### @$recs\n $#$recs\n");
@@ -129,6 +129,10 @@ use constant {
     RECORD_REV       => 5,
     RECORD_WHOLENAME => 6,
     SITE_REV         => 0, 
+    SITE_POLICY      => 1,
+    SITE_PRIORY      => 2,
+    SITE_VIEW        => 3,
+    SITE_STATUS      => 4,
 };
 
 sub getSiteInfo($)
@@ -140,7 +144,7 @@ sub getSiteInfo($)
         return \%site_h;
     }
     
-    my $sql = sprintf("select id,ip,type,dns,domain_id,rev,whole_name from records where whole_name='%s';", $name);
+    my $sql = qq/select id,ip,type,dns,domain_id,rev,whole_name from records where whole_name="$name"/;
     my $recs = runSQL($sql);
     if ($#$recs >= 0) {
         $site_h{'id'} = $recs->[0]->[RECORD_ID];
@@ -162,9 +166,13 @@ sub getSiteInfo($)
             $conf_h{$recs->[$i]->[CONFIG]} = $recs->[$i]->[CONFIG_VAL];
         }
 
-        $sql = "select rev from sites where siteid=$site_h{'id'}";
+        $sql = "select rev,policy,prioritycluster,views,status from sites where siteid=$site_h{'id'}";
         $recs = runSQL($sql);
-        $site_h{'rev_site'} = $recs->[0]->[SITE_REV];
+        $site_h{'site_rev'} = $recs->[0]->[SITE_REV];
+        $site_h{'site_policy'} = $recs->[0]->[SITE_POLICY];
+        $site_h{'site_priory'} = $recs->[0]->[SITE_PRIORY];
+        $site_h{'site_view'} = $recs->[0]->[SITE_VIEW];
+        $site_h{'site_status'} = $recs->[0]->[SITE_STATUS];
     }
 
     # fill info
