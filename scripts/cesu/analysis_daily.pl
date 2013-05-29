@@ -646,12 +646,12 @@ open($analysis_fp, ">/tmp/analysis_daily.txt");
 printf($analysis_fp "\n对比%s和%s的测速数据\n", $yesterday, $today);
 cesu_daily_log($yesterday, $today, "cesu", $analysis_fp);
 
+cache_hit_log($yesterday);
+
 printf($analysis_fp "\n### 机房性能变化 %s ~ %s ###\n", $yesterday, $today);
 compare_cluster($yesterday, $today);
 
 cluster_slow_log($yesterday, $today);
-
-cache_hit_log($yesterday);
 
 close($analysis_fp);
 
