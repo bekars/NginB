@@ -274,15 +274,15 @@ sub find_fast_pos($$$$)
     $ipseg_cli = "";
 
     if ($isfast) {
-        $pos_c_a_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{"${p_aqb}-${i_aqb}-${ipseg_aqb}"}{fast} += 1; 
-        $pos_c_o_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{"${p_org}-${i_org}-${ipseg_org}"}{slow} += 1; 
+        $pos_c_a_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{roleip}{"${p_aqb}-${i_aqb}-${ipseg_aqb}"}{fast} += 1; 
+        $pos_c_o_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{roleip}{"${p_org}-${i_org}-${ipseg_org}"}{slow} += 1; 
     } else {
-        $pos_c_a_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{"${p_aqb}-${i_aqb}-${ipseg_aqb}"}{slow} += 1; 
-        $pos_c_a_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{"${p_aqb}-${i_aqb}-${ipseg_aqb}"}{org}{"${p_org}-${i_org}-${ipseg_org}"}{total} += 1; 
-        $pos_c_o_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{"${p_org}-${i_org}-${ipseg_org}"}{fast} += 1; 
+        $pos_c_a_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{roleip}{"${p_aqb}-${i_aqb}-${ipseg_aqb}"}{slow} += 1; 
+        $pos_c_a_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{roleip}{"${p_aqb}-${i_aqb}-${ipseg_aqb}"}{org}{"${p_org}-${i_org}-${ipseg_org}"}{total} += 1; 
+        $pos_c_o_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{roleip}{"${p_org}-${i_org}-${ipseg_org}"}{fast} += 1; 
     }
-    $pos_c_a_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{"${p_aqb}-${i_aqb}-${ipseg_aqb}"}{total} += 1; 
-    $pos_c_o_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{"${p_org}-${i_org}-${ipseg_org}"}{total} += 1; 
+    $pos_c_a_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{roleip}{"${p_aqb}-${i_aqb}-${ipseg_aqb}"}{total} += 1; 
+    $pos_c_o_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{roleip}{"${p_org}-${i_org}-${ipseg_org}"}{total} += 1; 
 
     $pos_c_a_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{total} += 1;
     $pos_c_o_href->{"${p_cli}-${i_cli}-${ipseg_cli}"}{total} += 1;
@@ -337,7 +337,7 @@ sub generate_pos_log($$)
 
         printf($fp "$k1\t$pos_href->{$k1}{total}\n");
 
-        my $p = $pos_href->{$k1};
+        my $p = $pos_href->{$k1}{roleip};
         foreach my $k2 (keys %$p) {
             $p->{$k2}{rate} = roundFloat($p->{$k2}{fast} * 100 / $p->{$k2}{total});
         }
@@ -381,7 +381,7 @@ sub view_hit_from_clients()
                 find_fast_pos($ip_cli, $ip_aqb, $ip_org, $isfast);
             }
 
-            #last if ++$cnt > 50;
+            #last if ++$cnt > 100;
         }
         
         last if ($client_href->{$kip}{hit_cnt}<1000);
