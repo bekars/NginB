@@ -116,7 +116,7 @@ my $create_table_sql = "CREATE TABLE `speed_res_data_%s` (
 
 my $import_data_sql = qq/insert into speed_res_data_%s (select * from speed_monitor_res_data where monitor_time>='%s 00:00:00' and monitor_time<'%s 00:00:00')/;
 
-my $delete_data_sql = qq/delete from speed_monitor_res_data where monitor_time>='%s 00:00:00' and monitor_time<'%s 00:00:00')/;
+my $delete_data_sql = qq/delete from speed_monitor_res_data where monitor_time>='%s 00:00:00' and monitor_time<'%s 00:00:00'/;
 
 my $union_table_sql = qq/alter table speed_res_data_all union(%s)/;
 
@@ -135,13 +135,13 @@ printf("### import data into table speed_res_data_%s\n", $yesterday1);
 $sql = sprintf($import_data_sql, $yesterday1, $yesterday, $today);
 $recs = runSQL($sql);
 
-printf("### delete data from table speed_monitor_res_data\n", $yesterday1);
-$sql = sprintf($delete_data_sql, $yesterday, $today);
-$recs = runSQL($sql);
-
 printf("### alter uninon table speed_res_data_%s\n", $yesterday1);
 put_union_tables("speed_res_data_$yesterday1");
 $sql = sprintf($union_table_sql, get_union_tables());
+$recs = runSQL($sql);
+
+printf("### delete data from table speed_monitor_res_data\n", $yesterday1);
+$sql = sprintf($delete_data_sql, $yesterday, $today);
 $recs = runSQL($sql);
 
 $dbh->disconnect();

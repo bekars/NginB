@@ -28,7 +28,12 @@ my %cesu_type_h = (
     'dnspod' => 5,
 );
 
-# delete config cache=off site from cesu result
+#
+# kick off site
+# 1. cache == off
+# 2. schedule cluster > 3
+# 3. cesu error
+#
 sub speed_rate($$)
 {
     my ($date, $cesu_type) = @_;
