@@ -14,9 +14,10 @@ use Getopt::Long;
 use Smart::Comments;
 
 my $keyword = "total_time";
-my $date = `/bin/date -d "last day" +"%Y-%m-%d"`;#"2013-05-05";
+my $date = `/bin/date -d "last day" +"%Y-%m-%d"`;
 $date =~ tr/\n//d;
 
+#$date = "2013-05-31";
 
 my $site_rate_href = ();
 my $detail_href = ();
@@ -33,6 +34,7 @@ my %cesu_type_h = (
 # 1. cache == off
 # 2. schedule cluster > 3
 # 3. cesu error
+# 4. no point to aqb
 #
 sub speed_rate($$)
 {
@@ -199,22 +201,22 @@ sub sort_db_speed($$$)
 {
     my ($keyword, $date, $cesu_type) = @_;
     my $sql;
-    my $condition_sql = qq/total_time!=0 and error_id=0 and role_ip!="0.0.0.0"/;
-    my $time_sql = qq/monitor_time>="$date 00:00:00" and monitor_time<="$date 23:59:59"/;
-    my $group_sql = qq/role_id having count(*)>5 order by a/;
+    my $condition_sql = qq/and total_time!=0 and error_id=0 and role_ip!="0.0.0.0"/;
+    my $time_sql = qq/and monitor_time>="$date 00:00:00" and monitor_time<="$date 23:59:59" and speed_task.task_status=1/;
+    my $group_sql = qq/role_id having count(*)>3 order by a/;
 
     # org
-    $sql = qq/select role_id,role_name,round(avg($keyword),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.ip_role_id and speed_task.$cesu_type=1 and role_name like "%_ip" and $time_sql and $condition_sql group by $group_sql/;
+    $sql = qq/select role_id,role_name,round(avg($keyword),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.ip_role_id and speed_task.$cesu_type=1 and role_name like "%_ip" $time_sql $condition_sql group by $group_sql/;
     printf("%s\n", $sql);
     fetch_data($dbh->query($sql), ORG);
 
     # aqb
-    $sql = qq/select role_id,role_name,round(avg($keyword),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.aqb_role_id and speed_task.$cesu_type=1 and role_name like "%_aqb" and $time_sql and $condition_sql group by $group_sql/;
+    $sql = qq/select role_id,role_name,round(avg($keyword),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.aqb_role_id and speed_task.$cesu_type=1 and role_name like "%_aqb" $time_sql $condition_sql group by $group_sql/;
     printf("%s\n", $sql);
     fetch_data($dbh->query($sql), AQB);
 
     # dns
-    $sql = qq/select role_id,role_name,round(avg(dns_time),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.aqb_role_id and speed_task.$cesu_type=1 and role_name like "%_aqb" and $time_sql and $condition_sql group by $group_sql/;
+    $sql = qq/select role_id,role_name,round(avg(dns_time),4) as a from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.aqb_role_id and speed_task.$cesu_type=1 and role_name like "%_aqb" $time_sql $condition_sql group by $group_sql/;
     printf("%s\n", $sql);
     fetch_data($dbh->query($sql), DNS);
 
