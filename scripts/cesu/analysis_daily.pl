@@ -126,7 +126,7 @@ sub speed_data_analysis($)
     my $count = 0;
 
     # get all cesu role_id and sites
-    $sql = qq/select distinct(role_id),role_name from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.aqb_role_id and speed_task.cesu=1 and date(monitor_time)="$date" and role_name like "%_aqb" order by role_name/;
+    $sql = qq/select distinct(role_id),role_name from speed_monitor_data,speed_task where speed_monitor_data.role_id=speed_task.aqb_role_id and speed_task.cesu=1 and speed_task.task_status=1 and date(monitor_time)="$date" and role_name like "%_aqb" order by role_name/;
     $cesu_sites_aref = $dbh->query($sql);
 
     # 
