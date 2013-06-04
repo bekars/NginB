@@ -607,7 +607,11 @@ sub cache_hit_log($)
     my ($today) = @_;
     my $sql = qq/select cachehit,cacherate_flow,hit,hit_flow,total,total_flow from cache_hit where date(time)="$today"/;
     my $recs = $dbh->query($sql);
-    my ($cachehit, $cacherate, $hit, $hit_flow, $total, $total_flow) = @{$recs->[0]};
+
+    my ($cachehit, $cacherate, $hit, $hit_flow, $total, $total_flow) = (0, 0, 0, 0, 1, 1);
+    if (exists($recs->[0])) {
+        ($cachehit, $cacherate, $hit, $hit_flow, $total, $total_flow) = @{$recs->[0]};
+    }
 
     printf($analysis_fp "\n### 缓存命中率 %s ###\n" .
         "缓存命中率: %.2f%%, 缓存率: %.2f%%\n" .

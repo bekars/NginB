@@ -17,7 +17,7 @@ my $keyword = "total_time";
 my $date = `/bin/date -d "last day" +"%Y-%m-%d"`;
 $date =~ tr/\n//d;
 
-#$date = "2013-05-31";
+#$date = "2013-06-03";
 
 my $site_rate_href = ();
 my $detail_href = ();
