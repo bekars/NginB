@@ -17,17 +17,27 @@ my $keyword = "total_time";
 my $date = `/bin/date -d "last day" +"%Y-%m-%d"`;
 $date =~ tr/\n//d;
 
-#$date = "2013-06-03";
+#$date = "2013-06-02";
 
 my $site_rate_href = ();
 my $detail_href = ();
 my $dbh;
 my $do_db = 0;
+my $do_all = 0;
 
 my %cesu_type_h = (
     'cesu'   => 1,
     'dnspod' => 5,
 );
+
+my $city_code = {
+    '0'       => "all",
+    '1100201' => "shanghai",
+    '1101701' => "nanjing",
+    '1101601' => "hangzhou",
+    '1100101' => "beijing",
+    '1100501' => "guangzhou",
+};
 
 #
 # kick off site
@@ -36,9 +46,9 @@ my %cesu_type_h = (
 # 3. cesu error
 # 4. no point to aqb
 #
-sub speed_rate($$)
+sub speed_rate($$$)
 {
-    my ($date, $cesu_type) = @_;
+    my ($date, $cesu_type, $city) = @_;
     my $outf = "cesu_" . $date . ".txt";
     my %rate = (
         'TOTAL' => 0,
@@ -91,7 +101,7 @@ sub speed_rate($$)
                     type     => $cesu_type,
                     time     => "$date 00:00:00",
                 };
-                $dbh->insert('site_cesu_daily', $sdata) if $do_db;
+                $dbh->insert('site_cesu_daily', $sdata) if ($city eq $city_code->{0}) and $do_db;
             } else {
                #printf("### OUT site: %s\n", $arr[1]);
            }
@@ -117,21 +127,36 @@ sub speed_rate($$)
         }
     }
 
-    $rate{FAST_RATE} = $rate{FAST} * 100 / $rate{TOTAL};
+    $rate{FAST_RATE} = 0;
+    $rate{FAST_RATE} = $rate{FAST} * 100 / $rate{TOTAL} if $rate{TOTAL};
     $rate{FAST_RATE} = roundFloat($rate{FAST_RATE});
-    $rate{SLOW_RATE} = $rate{SLOW} * 100 / $rate{TOTAL};
+
+    $rate{SLOW_RATE} = 0;
+    $rate{SLOW_RATE} = $rate{SLOW} * 100 / $rate{TOTAL} if $rate{TOTAL};
     $rate{SLOW_RATE} = roundFloat($rate{SLOW_RATE});
-    $rate{SAME_RATE} = $rate{SAME} * 100 / $rate{TOTAL};
+
+    $rate{SAME_RATE} = 0;
+    $rate{SAME_RATE} = $rate{SAME} * 100 / $rate{TOTAL} if $rate{TOTAL};
     $rate{SAME_RATE} = roundFloat($rate{SAME_RATE});
-    $rate{BIGZ_RATE} = $rate{BIGZERO} * 100 / $rate{TOTAL};
+
+    $rate{BIGZ_RATE} = 0;
+    $rate{BIGZ_RATE} = $rate{BIGZERO} * 100 / $rate{TOTAL} if $rate{TOTAL};
     $rate{BIGZ_RATE} = roundFloat($rate{BIGZ_RATE});
-    $rate{FAST_AVG}  = $rate{BIGZERO_CNT} / $rate{BIGZERO};
+
+    $rate{FAST_AVG}  = 0;
+    $rate{FAST_AVG}  = $rate{BIGZERO_CNT} / $rate{BIGZERO} if $rate{BIGZERO};
     $rate{FAST_AVG}  = roundFloat($rate{FAST_AVG});
-    $rate{SLOW_AVG}  = $rate{LESSZERO_CNT} / $rate{LESSZERO};
+
+    $rate{SLOW_AVG}  = 0;
+    $rate{SLOW_AVG}  = $rate{LESSZERO_CNT} / $rate{LESSZERO} if $rate{LESSZERO};
     $rate{SLOW_AVG}  = roundFloat($rate{SLOW_AVG});
-    $rate{ALLBIGZ_RATE} = $rate{ALL_BIGZERO} * 100 / $rate{ALL_TOTAL};
+
+    $rate{ALLBIGZ_RATE}  = 0;
+    $rate{ALLBIGZ_RATE} = $rate{ALL_BIGZERO} * 100 / $rate{ALL_TOTAL} if $rate{ALL_TOTAL};
     $rate{ALLBIGZ_RATE} = roundFloat($rate{ALLBIGZ_RATE});
-    $rate{ALLFAST_AVG}  = $rate{ALL_BIGZERO_CNT} / $rate{ALL_BIGZERO};
+
+    $rate{ALLFAST_AVG}  = 0;
+    $rate{ALLFAST_AVG}  = $rate{ALL_BIGZERO_CNT} / $rate{ALL_BIGZERO} if $rate{ALL_BIGZERO};
     $rate{ALLFAST_AVG}  = roundFloat($rate{ALLFAST_AVG});
     showHash(\%rate);
 
@@ -161,6 +186,7 @@ sub speed_rate($$)
         all_fastavg => $rate{ALLFAST_AVG},
         all_total => $rate{ALL_TOTAL},
         type => $cesu_type,
+        city => $city,
         time => "$date 00:00:00",
     };
     $dbh->insert('cesu_daily', $data) if $do_db;
@@ -197,11 +223,16 @@ use constant {ORG=>0, AQB=>1, DNS=>2};
 #my $mysql_comm = 'mysql -h116.213.78.228 -ucesureadonly -p66ecf9c968132321a02e6e7aff34ce5d -P3306 -Dspeed -B -N -e ';
 #my $mysql_comm = 'mysql -h59.151.123.74 -ucesu_readonly -p\'Speed@)!@readonly\' -P3307 -Dspeed -B -N -e ';
 
-sub sort_db_speed($$$)
+sub sort_db_speed($$$$)
 {
-    my ($keyword, $date, $cesu_type) = @_;
-    my $sql;
-    my $condition_sql = qq/and total_time!=0 and error_id=0 and role_ip!="0.0.0.0"/;
+    my ($keyword, $date, $cesu_type, $city) = @_;
+    my ($sql, $condition_sql);
+    if ($city > 0) {
+        $condition_sql = qq/and city_code=$city and total_time!=0 and error_id=0 and role_ip!="0.0.0.0"/;
+    } else {
+        $condition_sql = qq/and total_time!=0 and error_id=0 and role_ip!="0.0.0.0"/;
+    }
+
     my $time_sql = qq/and monitor_time>="$date 00:00:00" and monitor_time<="$date 23:59:59" and speed_task.task_status=1/;
     my $group_sql = qq/role_id having count(*)>3 order by a/;
 
@@ -294,6 +325,7 @@ sub get_site_name($)
 
 GetOptions(
     'do_db|d+' => \$do_db,
+    'do_all|a+' => \$do_all,
 );
 
 $dbh = BMD::DBH->new(
@@ -308,14 +340,22 @@ $dbh = BMD::DBH->new(
 
 foreach my $k (sort {$cesu_type_h{$a} <=> $cesu_type_h{$b}} keys %cesu_type_h) 
 {
-    $site_rate_href = ();
-    $detail_href = ();
+    LOOP: foreach my $e (sort keys %$city_code) {
 
-    # analysis cesu data
-    sort_db_speed($keyword, $date, $k);
+        printf("### $k $e ###\n");
+        $site_rate_href = ();
+        $detail_href = ();
 
-    # calculata speed rate
-    speed_rate($date, $k);
+        # analysis cesu data
+        sort_db_speed($keyword, $date, $k, $e);
+
+        # calculata speed rate
+        speed_rate($date, $k, $city_code->{$e});
+
+        if (!$do_all and ($e==0)) {
+            last LOOP;
+        }
+    }
 }
 
 $dbh->fini();
