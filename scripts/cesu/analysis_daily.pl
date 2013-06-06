@@ -28,6 +28,7 @@ $yesterday =~ tr/\n//d;
 my $dbh;
 my $do_db = 0;
 my $do_analysis = 0;
+my $do_debug = 0;
 
 my $analysis_fp;
 
@@ -60,6 +61,7 @@ use constant {
     ANA_MONITOR_TIME   => 7,
     ANA_DNS_TIME       => 8,
     ANA_ERR_ID         => 9,
+    ANA_MAIN_ID        => 10,
 };
 
 use constant {
@@ -548,7 +550,7 @@ sub cesu_daily_log($$$$)
 {
     my ($yesterday, $today, $type, $fp) = @_;
 
-    my $sql_tmpl = qq/select bigzero,fast,fastavg,slow,slowavg,total,all_bigzero,all_fastavg,all_total,date(time) from cesu_daily where type='%s' and date(time)='%s'/;
+    my $sql_tmpl = qq/select bigzero,fast,fastavg,slow,slowavg,total,all_bigzero,all_fastavg,all_total,date(time) from cesu_daily where type='%s' and city='all' and date(time)='%s'/;
 
     my $sql = sprintf($sql_tmpl, $type, $yesterday);
     my $recs = $dbh->query($sql);
@@ -622,13 +624,97 @@ sub cache_hit_log($)
         $total / 100000000, $total_flow / 1024 / 1024 /1024);
 }
 
+sub get_ipseg($)
+{
+    my $ip = shift;
+    $ip =~ m/(.*)\.\d+/;
+    return $1;
+}
+
+sub analysis_one_site($$$$)
+{
+    my ($site, $city, $start, $end) = @_;
+    my $sqlplus = qq//;
+    my $sql = qq/select role_id,role_name,role_ip,total_time,tcp_time,response_time,download_speed,monitor_time,dns_time,error_id,stat_main_id from speed_monitor_data where monitor_time>="$start 00:00:00" and monitor_time<="$end 23:59:59" and role_name like "${site}_%" and city_code=$city $sqlplus order by monitor_time/;
+    my $site_aref = $dbh->query($sql);
+
+    my $vs_data = ();
+
+    LOOP: for (my $i = 0; $i <= $#$site_aref; $i++) {
+
+        my $r = $site_aref->[$i];
+        my $n;
+        my $id = $r->[ANA_MAIN_ID];
+
+        if ((get_ipseg($r->[ANA_ROLE_IP]) ne "122.200.77") &&
+            ($r->[ANA_ROLE_NAME] =~ m/.*_aqb/)) {
+            next LOOP;
+        }
+
+        if ($r->[ANA_ROLE_NAME] =~ m/.*_aqb/) {
+            $n = 'aqb';
+        } else {
+            $n = 'org';
+        }
+
+        $vs_data->{$id}{$n}{&ANA_ROLE_ID} = $r->[ANA_ROLE_ID];
+        $vs_data->{$id}{$n}{&ANA_ROLE_NAME} = $r->[ANA_ROLE_NAME];
+        $vs_data->{$id}{$n}{&ANA_ROLE_IP} = $r->[ANA_ROLE_IP];
+        $vs_data->{$id}{$n}{&ANA_TOTAL_TIME} = $r->[ANA_TOTAL_TIME];
+        $vs_data->{$id}{$n}{&ANA_TCP_TIME} = $r->[ANA_TCP_TIME];
+        $vs_data->{$id}{$n}{&ANA_RESPONSE_TIME} = $r->[ANA_RESPONSE_TIME];
+        $vs_data->{$id}{$n}{&ANA_DOWNLOAD_SPEED} = $r->[ANA_DOWNLOAD_SPEED];
+        $vs_data->{$id}{$n}{&ANA_MONITOR_TIME} = $r->[ANA_MONITOR_TIME];
+        $vs_data->{$id}{$n}{&ANA_DNS_TIME} = $r->[ANA_DNS_TIME];
+        $vs_data->{$id}{$n}{&ANA_ERR_ID} = $r->[ANA_ERR_ID];
+        $vs_data->{$id}{$n}{&ANA_MAIN_ID} = $r->[ANA_MAIN_ID];
+    }
+
+    # here calculate aqb vs org
+    my ($big_cnt, $total, $rate_total) = (0, 0, 0);
+    foreach my $k (sort keys %$vs_data) {
+        if (exists($vs_data->{$k}{aqb}) && exists($vs_data->{$k}{org}) &&
+            (0==$vs_data->{$k}{aqb}{&ANA_ERR_ID}) && (0==$vs_data->{$k}{org}{&ANA_ERR_ID})) 
+        {
+            $vs_data->{$k}{org}{&ANA_TOTAL_TIME} += $vs_data->{$k}{aqb}{&ANA_DNS_TIME} if $vs_data->{$k}{org}{&ANA_TOTAL_TIME}>0;
+            if (vs_rate($start, $site, $city, "00", $vs_data->{$k})) {
+                ++$big_cnt if $vs_data->{$k}{all}{total_rate} > 0;
+                ++$total;
+
+                $rate_total += $vs_data->{$k}{all}{total_rate};
+            }
+            printf(Dumper($vs_data->{$k})) if $do_debug;
+            printf("#############################\n") if $do_debug;
+        }
+
+    }
+
+    if ($total == 0) {
+        $big_cnt = 0;
+        $rate_total = 0;
+        $total = 1;
+    }
+
+    return (roundFloat($big_cnt * 100 / $total), roundFloat($rate_total / $total));
+}
+
 #
-# begin to run
+# begin to main run
 #
+
+my $site_arg = undef;
+my $city_arg = 'all';
+my $start_arg = $today;
+my $end_arg = $today;
 
 GetOptions(
     'do_db|d+' => \$do_db,
+    'debug|b+' => \$do_debug,
     'do_analysis|a+' => \$do_analysis,
+    'site=s' => \$site_arg,
+    'city=s' => \$city_arg,
+    'start=s' => \$start_arg,
+    'end=s' => \$end_arg,
 );
 
 $dbh = BMD::DBH->new(
@@ -641,32 +727,195 @@ $dbh = BMD::DBH->new(
     'dbport' => 3306
 );
 
-speed_data_analysis($today) if $do_analysis;
+my @adjsite = (
+'029.iseeyu.com',
+'2dou.com',
+'3g.360fandu.cn',
+'44449.cn',
+'815494.com',
+'app.ddwoo.com',
+'b.513400.cn',
+'baimei.com',
+'bbs.kx2222.com',
+'bbs.nbzs.com.cn',
+'bbs.sjz7.com',
+'bbs.skyhong.com',
+'bbs.xuefa.com',
+'cdn6.tuzi123.com',
+'chengyintong.com',
+'chn-angel.com',
+'club.sportscn.com',
+'cniso.org',
+'cqzs.com.cn',
+'d.mzx.cc',
+'demo.jiaocheng.la',
+'easylogo.cn',
+'edu67.com',
+'elifo.com.cn',
+'eyubang.com',
+'fl.mzx.cc',
+'ganmaer.cn',
+'gymsx.ggxy.com',
+'home.kx2222.com',
+'home.xuefa.com',
+'huoyanshan.com',
+'idc.idcqfkj.com',
+'izda.com',
+'ksgs.net',
+'liaoren.net',
+'linyisteel.com',
+'m.513400.cn',
+'m.ljpzt.cn',
+'m.stusz.com',
+'mp3.30kp.com',
+'mzx.cc',
+'nbzs.cn',
+'news.stusz.com',
+'nmfwgy.com',
+'p.tiantiantuangou.com',
+'pan.ta7.cn',
+'pangjiu.net',
+'pinmie.com',
+'qjcl.net',
+'qun.0418e.com',
+'rmbz.net',
+'shiliwu.cn',
+'show.gameres.com',
+'shu-men.com',
+'static.cnfeol.com',
+'stusz.com',
+'takely.com',
+'tg.enjoyoung.cn',
+'tijian.180yy.com',
+'union.tdwan.com',
+'vip.0418e.com',
+'wocye.com',
+'www.0418e.com',
+'www.0557bike.com',
+'www.0561tb.com',
+'www.0768.so',
+'www.123wzm.com',
+'www.1qwer.com',
+'www.360gsz.com',
+'www.bakingerp.com',
+'www.bobojy.cn',
+'www.boyainfo.com',
+'www.chihuohezi.com',
+'www.crazyjolie.com',
+'www.dbyzs.com',
+'www.dingjiyuming.cn',
+'www.fate-x.net',
+'www.fjjazh8.com',
+'www.ganmaer.cn',
+'www.gsbug.com',
+'www.haifanlp.com',
+'www.hifanli.com',
+'www.ihezhu.com',
+'www.it121.com',
+'www.jmchn.com',
+'www.leaitian.com',
+'www.liaoren.net',
+'www.nmjsy.com',
+'www.nuodou.com',
+'www.osight.com',
+'www.pf-e.cn',
+'www.pinmie.com',
+'www.ruanko.com',
+'www.shu-men.com',
+'www.taomiji.com',
+'www.tianjinghu.com',
+'www.tymtsr.com',
+'www.wixiang.com',
+'www.woshare.cn',
+'www.wpan.cc',
+'www.xinshehua.com',
+'www.xinxiangban.com',
+'www.xuefa.com',
+'www.xyyylm.cn',
+'www.ycyhhotel.com',
+'www.yeda.cc',
+'www.yqmarket.com',
+'www.yuanlai.biz',
+'www.yun155.com',
+'www.zzlm.com.cn',
+'xa.takely.com',
+'xdez.net',
+'xiao.56cst.com',
+'xiaxiangqi.com',
+'xqplayer.com',
+'ycyhhotel.com',
+'yuanlai.biz',
+'zyys123.com',
+);
 
-cluster_cesu_daily($today) if $do_analysis;
+my $dtime = [
+    "2013-05-28",
+    "2013-05-29",
+    "2013-05-30",
+    "2013-05-31",
+    "2013-06-01",
+    "2013-06-02",
+    "2013-06-03",
+];
 
-open($analysis_fp, ">/tmp/analysis_daily.txt");
 
-printf($analysis_fp "\n对比%s和%s的测速数据\n", $yesterday, $today);
-cesu_daily_log($yesterday, $today, "cesu", $analysis_fp);
+if ($site_arg) {
+    #
+    # analysis one site
+    #
+    printf("### $site_arg $city_arg $start_arg $end_arg\n") if $do_debug;
 
-cache_hit_log($yesterday);
+    open(my $f, ">/tmp/big.txt");
+    open(my $p, ">/tmp/rate.txt");
+    $f->autoflush(1);
+    $p->autoflush(1);
+    foreach my $s (@adjsite) {
+        printf($f "$s\t");
+        printf($p "$s\t");
+        foreach my $t (@$dtime) {
+            my ($big, $rate) = analysis_one_site($s, "1100101", $t, $t);
+            printf($f "$big\t");
+            printf($p "$rate\t");
+        }
+        printf($f "\n");
+        printf($p "\n");
 
-printf($analysis_fp "\n### 机房性能变化 %s ~ %s ###\n", $yesterday, $today);
-compare_cluster($yesterday, $today);
+        $|++;
+    }
+    close($f);
+    close($p);
 
-cluster_slow_log($yesterday, $today);
+    #my ($big, $rate) = analysis_one_site($site_arg, $city_arg, $start_arg, $end_arg);
+    #printf("$big\t$rate\n");
 
-close($analysis_fp);
+} else {
+    speed_data_analysis($today) if $do_analysis;
 
-#
-# dnspod cesu data
-#
-open(my $dnspod_fp, ">/tmp/dnspod_daily.txt");
-printf($dnspod_fp "\n对比%s和%s的测速数据\n", $yesterday, $today);
-cesu_daily_log($yesterday, $today, "dnspod", $dnspod_fp);
+    cluster_cesu_daily($today) if $do_analysis;
 
-close($dnspod_fp);
+    open($analysis_fp, ">/tmp/analysis_daily.txt");
+
+    printf($analysis_fp "\n对比%s和%s的测速数据\n", $yesterday, $today);
+    cesu_daily_log($yesterday, $today, "cesu", $analysis_fp);
+
+    cache_hit_log($yesterday);
+
+    printf($analysis_fp "\n### 机房性能变化 %s ~ %s ###\n", $yesterday, $today);
+    compare_cluster($yesterday, $today);
+
+    cluster_slow_log($yesterday, $today);
+
+    close($analysis_fp);
+
+    #
+    # dnspod cesu data
+    #
+    open(my $dnspod_fp, ">/tmp/dnspod_daily.txt");
+    printf($dnspod_fp "\n对比%s和%s的测速数据\n", $yesterday, $today);
+    cesu_daily_log($yesterday, $today, "dnspod", $dnspod_fp);
+
+    close($dnspod_fp);
+}
 
 $dbh->fini();
 
