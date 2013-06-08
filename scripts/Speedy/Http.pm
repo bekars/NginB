@@ -3,7 +3,8 @@
 package	Speedy::Http;
 use		strict;
 use warnings;
-use     WWW::Curl::Easy;
+use WWW::Curl::Easy;
+use Compress::Zlib;
 require	Exporter;
 
 #class global vars ...
@@ -12,7 +13,29 @@ use vars qw($VERSION @EXPORT @ISA);
 @EXPORT  = qw(&getHttpInfo &checkDynPage);
 $VERSION = '1.0.0';
 
+my $isprint = 1;
 
+my $response_body;
+sub body_callback 
+{
+    my ($chunk,$context)=@_;
+    if ($isprint) {
+        #printf("#### $chunk #####\n");
+        if (($chunk eq "\r\n") ||
+            ($chunk eq "\n"))
+        {
+            $isprint = 0;
+        }
+    } else {
+        #printf("AAAA  $chunk AAAA\n");
+        #my $dest = Compress::Zlib::memGunzip($chunk) or die "Cannot uncompress: $gzerrno\n";
+        $response_body = $response_body . $chunk;
+    }
+    push @{$context}, $chunk;
+    return length($chunk); # OK
+}
+
+my @body = ();
 sub getHttpInfo($)
 {
     my %http_h = ();
@@ -25,14 +48,17 @@ sub getHttpInfo($)
 
     $curl->setopt(CURLOPT_HEADER, 1);
     $curl->setopt(CURLOPT_URL, $url);
-    $curl->setopt(CURLOPT_CONNECTTIMEOUT, 10);
-    $curl->setopt(CURLOPT_TIMEOUT, 10);
+    $curl->setopt(CURLOPT_CONNECTTIMEOUT, 20);
+    $curl->setopt(CURLOPT_TIMEOUT, 30);
 
     # a filehandle, reference to a scalar or reference to a typeglob can be used here.
     my $response_header;
-    my $response_body;
     $curl->setopt(CURLOPT_HEADERDATA, \$response_header);
-    $curl->setopt(CURLOPT_WRITEDATA, \$response_body);
+#$curl->setopt(CURLOPT_WRITEDATA, \$response_body);
+#$curl->setopt(CURLOPT_TRANSFER_ENCODING, 1);
+    $curl->setopt(CURLOPT_WRITEFUNCTION, \&body_callback);
+    $curl->setopt(CURLOPT_FILE, \@body);
+    $curl->setopt(CURLOPT_ACCEPT_ENCODING, "gzip");
 
     # start the actual request
     my $retcode = $curl->perform;

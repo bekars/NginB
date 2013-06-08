@@ -51,7 +51,7 @@ sub init()
 {
     my $self = shift;
     my $ipos = BMD::IPOS->new();
-    $ipos->load("/opt/");
+    $ipos->load2("/opt/");
     $self->{ipos} = $ipos;
 }
 
@@ -79,7 +79,7 @@ sub fini()
     my $ip_cnt = keys %$_allip_h;
     my $n = 0;
     foreach my $k1 (sort keys %$_allip_h) {
-        my ($country, $province, $isp) = $self->{ipos}->query($k1);
+        my ($country, $province, $isp) = $self->{ipos}->query2($k1);
 
         $n += 1;
         printf("$n/$ip_cnt $country, $province, $isp\n");
