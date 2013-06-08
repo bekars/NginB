@@ -14,29 +14,39 @@ use Date::Parse;
 use Speedy::TTL qw(&ttl_analysis_mod &ttl_analysis_init &ttl_result &get_maxage_interval &get_expired_interval %expires_h);
 use Speedy::CacheControl qw(&cachecontrol_analysis_mod &cachecontrol_analysis_init);
 use Speedy::CacheHit qw(&cachehit_analysis_mod &cachehit_analysis_init &cachehit_result %cache_hit_h %cache_http_status_h %cache_expired_h);
-use Speedy::Utils qw(&showHash);
+use Speedy::Utils;
 use Speedy::Html qw(&html_analysis_mod &html_analysis_init %html_http_header_h);
 use IO::Handle;
+
+use Speedy::ClientPos;
 
 my %options = ();
 my $startime = new Benchmark;
 
-my $home_dir = "/var/BLOGS/logs/";
-my $log_time = "20130216";
+my $log_time = "20130531";
+my $home_dir = "/var/BLOGS/$log_time";
 my $debug = 0;
 my $debuglog = 0;
 
 my %mod_h = ();
+
+
+my $clipos_m = Speedy::ClientPos->new();
+$clipos_m->set_basedir("/var/log");
+$clipos_m->init();
+
 
 sub mod_init
 {
     $mod_h{date} = $log_time;
     $mod_h{dir} = "SPD_$log_time";
 
+=pod
     ttl_analysis_init(\%mod_h);
     cachehit_analysis_init(\%mod_h);
     cachecontrol_analysis_init(\%mod_h);
     html_analysis_init(\%mod_h);
+=cut
 }
 
 
@@ -153,21 +163,18 @@ sub analysis_url
 }
 
 #
-# Rate - 各种头域出现的比率，整体的和未缓存的
-# MISS Res - 未命中缓存资源
-# No-Cache Res - 未缓存资源 ==> log
-#
-#
 # Log Format
 # 127.0.0.1 - - [27/Nov/2012:12:10:59 +0800] "GET http://www.google-analytics.com/__utm.gif?utmwv=5.3.8&utms=1&utmn=2097981030&utmhn=www.anquanbao.com HTTP/1.1" 200 35 "http://www.anquanbao.com/" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:17.0) Gecko/17.0 Firefox/17.0" "-" "-" MISS "Wed, 19 Apr 2000 11:43:00 GMT" "private, no-cache, no-cache=Set-Cookie, proxy-revalidate" "AAAAAAAAAAA" "Wed, 21 Jan 2004 19:51:30 GMT" 0.085 0.085 "-"
 #
-#        0    1   2      3      4            5       6             7    8 
-# domain time url status length cache-status expired cache-control etag last-modified
+# log_format main 
+#   $remote_addr $hostname $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" 
+#   "$http_user_agent" "$http_x_forwarded_for" "$http_cookie" $upstream_cache_status
+#   "$upstream_http_expires" "$upstream_http_cache_control" "$upstream_http_etag" "$upstream_http_last_modified"
+#   $request_time $upstream_response_time "$request_body";
 #
-#                     1           2         3       4                                                           5         6           7           8           9
-my $log_reg = qr/.*?\[(?# TIME)(.*?)\]\s+\"(?# URI)(.*?)\"\s+(?# HTTP_STATUS)(.*?)\s+(?# HTTP_LEN)(.*?)\s+\"[^\"]*\"\s+\"[^\"]*\"\s+\"[^\"]*\"\s+\"[^\"]*\"\s+(?# CACHE_STATUS)(.*?)\s+\"(?# EXPIRED)(.*?)\"\s+\"(?# CACHE_CONTROL)(.*?)\"\s+\"(?# ETAG)(.*?)\"\s+\"(?# LAST_MODIFIED)(.*?)\"\s+.*/;
+my $log_reg = qr/^(?# REMOTE_IP)(.*?)\s+(?# CLUSTER)(.*?)\.(?# THREAD)(.*?)\s+.*?\[(?# TIME)(.*?)\]\s+\"(?# URI)(.*?)\"\s+(?# HTTP_STATUS)(.*?)\s+(?# HTTP_LEN)(.*?)\s+\"[^\"]*\"\s+\"(?# AGENT)(.*?)\"\s+\"[^\"]*\"\s+\"[^\"]*\"\s+(?# CACHE_STATUS)(.*?)\s+\"(?# EXPIRED)(.*?)\"\s+\"(?# CACHE_CONTROL)(.*?)\"\s+\"(?# ETAG)(.*?)\"\s+\"(?# LAST_MODIFIED)(.*?)\"\s+.*/;
 
-use constant {TIME=>0, URL=>1, STATUS=>2, LENGTH=>3, CACHE_STATUS=>4, EXPIRED=>5, CACHE_CONTROL=>6, ETAG=>7, LAST_MODIFIED=>8};
+use constant {REMOTE_IP=>0, CLUSTER=>1, THREAD=>2, TIME=>3, URL=>4, STATUS=>5, LENGTH=>6, AGENT=>7, CACHE_STATUS=>8, EXPIRED=>9, CACHE_CONTROL=>10, ETAG=>11, LAST_MODIFIED=>12};
 
 #
 # log_data_a : log reg word segment
@@ -178,14 +185,15 @@ sub analysis
 {
     my ($log_data_a, $domain, $log) = @_;
 
-    #print(join "|", @$log_data_a);
-    #print("\n\n");
+    $log =~ s/%/%%/g;
 
-    my ($http_method, $http_url, $http_arg, $http_suffix) = analysis_url($log_data_a->[1]);
+    my ($http_method, $http_url, $http_arg, $http_suffix) = analysis_url($log_data_a->[URL]);
  
     my %node_h = (
         domain          => $domain,
         log             => $log,
+        remote_ip       => $log_data_a->[REMOTE_IP],
+        cluster         => $log_data_a->[CLUSTER],
         time            => $log_data_a->[TIME],
         http_method     => $http_method,
         http_url        => $http_url,
@@ -193,6 +201,7 @@ sub analysis
         http_suffix     => $http_suffix,
         http_status     => $log_data_a->[STATUS],
         http_len        => $log_data_a->[LENGTH],
+        agent           => $log_data_a->[AGENT],
         cache_status    => $log_data_a->[CACHE_STATUS],
         cache_expired   => $log_data_a->[EXPIRED],
         cache_control   => $log_data_a->[CACHE_CONTROL],
@@ -204,11 +213,15 @@ sub analysis
         dump_mod(\%node_h);
     }
 
+    $clipos_m->analysis(\%node_h);
+
+=pod
     nocache_analysis_mod(\%node_h);
     cachehit_analysis_mod(\%node_h);
     ttl_analysis_mod(\%node_h);
     cachecontrol_analysis_mod(\%node_h);
     html_analysis_mod(\%node_h);
+=cut
 }
 
 sub unzip_tmpfile
@@ -315,6 +328,31 @@ sub walk_dir
     closedir(DIRHANDLE);
 }
 
+sub walk_log
+{
+    my ($dir, $suffix, $cbfunc, $log_arr) = @_;
+
+    my $cnt = 0;
+
+    if (!defined($suffix)) {
+        $suffix = ".*";
+    }
+
+    foreach my $node (@$log_arr) {
+        printf("### $node\n");
+        my $file = $dir . "/access_" . $node . "_80\." . $suffix;
+
+        if (-e $file) {
+            $cnt += 1;
+            printf("Analysis $cnt $node Log File: $file ...\n\n");
+            ## parse_log ########
+            &{$cbfunc}($file, \&analysis, $log_reg, $node);
+        }
+    }
+
+    return 1;
+}
+
 sub usage
 {
     print("Usage: \n" . 
@@ -339,8 +377,6 @@ if (exists($options{h})) {
     usage();
 }
 
-open(DUMPFILE, ">dump.result");
-
 if (exists($options{D})) {
     $debug = 1;
 }
@@ -349,28 +385,43 @@ if (exists($options{L})) {
     $debuglog = 1;
 }
 
+if (exists($options{t})) {
+    $log_time = $options{t};
+}
+
+if (exists($options{d})) {
+    $home_dir = $options{d};
+}
+
+mod_init();
+
 if (exists($options{f})) {
     -e $options{f} or log_exit("ERR: no find file $options{f}!");
 
-    if ($options{f} =~ m/.*?access_(.*?)_.*/i) {
-        printf("Analysis $1 Log File: $options{f} ...\n\n");
+    open(my $fp, "<$options{f}");
+    my @log_arr = ();
+    while (<$fp>) {
+        $_ =~ tr/\n//d;
+        push(@log_arr, $_)
+    }
+    close($fp);
+    
+    walk_log($home_dir, "log.$log_time", \&parse_log, \@log_arr);
+ 
+    #if ($options{f} =~ m/.*?access_(.*?)_.*/i) {
+    #    printf("Analysis $1 Log File: $options{f} ...\n\n");
         ## parse_log ########
-        parse_log($options{f}, \&analysis, $log_reg, $1);
-    }
+    #    parse_log($options{f}, \&analysis, $log_reg, $1);
+    #}
 } else {
-    if (exists($options{t})) {
-        $log_time = $options{t};
-    }
-
-    if (exists($options{d})) {
-        $home_dir = $options{d};
-    }
-
     mkdir("SPD_$log_time", 0755);# or log_exit("ERR: can not mkdir $options{t}!");
-    mod_init();
     walk_dir($home_dir, "log.$log_time", \&parse_log);
 }
 
+$clipos_m->fini();
+$clipos_m->destroy();
+
+=pod
 my $result_file = sprintf("%s/analysis_%s.result", $mod_h{dir}, $mod_h{date});
 showHash(\%cache_hit_h, "CACHE_HIT", $result_file);
 showHash(\%cache_http_status_h, "CACHE_STATUS", $result_file);
@@ -384,12 +435,13 @@ showHash(\%expires_h, "EXPIRED_TTL", $result_file);
 
 cachehit_result();
 ttl_result();
+=cut
+
 
 if (exists($options{T})) {
     printf "\n\n### %s ###\n\n", timestr(timediff(new Benchmark, $startime));
 }
 
-close(DUMPFILE);
 
 __END__
 

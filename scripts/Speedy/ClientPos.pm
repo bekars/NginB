@@ -108,7 +108,13 @@ sub fini()
     open(my $fp, ">site_cli_pos.txt");
     printf($fp "\t");
     foreach my $k (sort {$_allpos_h->{$b}<=>$_allpos_h->{$a}} keys %$_allpos_h) {
-        printf($fp "${k} ($_allpos_h->{$k}%%)\t");
+        printf($fp "${k}\t");
+    }
+    printf($fp "\n");
+
+    printf($fp "\t");
+    foreach my $k (sort {$_allpos_h->{$b}<=>$_allpos_h->{$a}} keys %$_allpos_h) {
+        printf($fp "$_allpos_h->{$k}%%\t");
     }
     printf($fp "\n");
 
