@@ -138,3 +138,27 @@ end
 
 delimiter ;
 
+
+CREATE TABLE `ip` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `cnt` bigint(20) unsigned NOT NULL DEFAULT '0',
+  `ip` varchar(100) NOT NULL,
+  `ipnum` int(20) unsigned NOT NULL,
+  `country` varchar(32) NOT NULL,
+  `country_id` varchar(16) NOT NULL,
+  `area` varchar(32) NOT NULL,
+  `area_id` int(20) DEFAULT NULL,
+  `region` varchar(32) NOT NULL,
+  `region_id` int(20) DEFAULT NULL,
+  `city` varchar(32) NOT NULL,
+  `city_id` int(20) DEFAULT NULL,
+  `county` varchar(32) NOT NULL,
+  `county_id` int(20) DEFAULT NULL,
+  `isp` varchar(32) NOT NULL,
+  `isp_id` int(20) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `index_ip` (`ip`),
+  KEY `index_ipnum` (`ipnum`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
