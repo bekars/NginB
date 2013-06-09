@@ -28,6 +28,21 @@ sub new()
     return $self;
 }
 
+sub _download_rate($)
+{
+    my $node_h = shift;
+
+    if (($node_h->{cache_status} eq "HIT") &&
+        ($node_h->{http_status} eq "200") && 
+        ($node_h->{body_len} > 1000) && 
+        ($node_h->{req_time} > 0.01)) 
+    {
+        return _round(($node_h->{body_len} / $node_h->{req_time}), 2);
+    }
+
+    return 0;
+}
+
 sub analysis($)
 {
     my $self = shift;
@@ -39,6 +54,13 @@ sub analysis($)
 
     my $ipseg = _get_ipseg($node_h->{remote_ip});
     $_site_h->{$node_h->{domain}}{ipseg}{$ipseg}{cnt} += 1;
+
+    # calculte download rate
+    my $drate = _download_rate($node_h);
+    if ($drate > 0) {
+        $_site_h->{$node_h->{domain}}{ipseg}{$ipseg}{download_rate} += $drate;
+        $_site_h->{$node_h->{domain}}{ipseg}{$ipseg}{download_cnt} += 1;
+    }
 
     return 1;
 }
@@ -75,21 +97,26 @@ sub fini()
         }
     }
 
+    printf(Dumper($_site_h));
+
     # ip => pos
     my $ip_cnt = keys %$_allip_h;
     my $n = 0;
     foreach my $k1 (sort keys %$_allip_h) {
         my ($country, $province, $isp) = $self->{ipos}->query2($k1);
+        my $position = "${province}_${isp}";
 
         $n += 1;
-        printf("$n/$ip_cnt $country, $province, $isp\n");
+        printf("$n/$ip_cnt $country, $province, $isp\n") if $self->{debug};
 
-        $_allpos_h->{"${province}_${isp}"} += $_allip_h->{$k1};
+        $_allpos_h->{$position} += $_allip_h->{$k1};
     
         foreach my $k2 (keys %$_site_h) {
             if (exists($_site_h->{$k2}{ipseg}{$k1})) {
-                $_site_h->{$k2}{pos}{"${province}_${isp}"}{cnt} += $_site_h->{$k2}{ipseg}{$k1}{cnt};
-                $_site_h->{$k2}{pos}{"${province}_${isp}"}{rate} += $_site_h->{$k2}{ipseg}{$k1}{rate};
+                $_site_h->{$k2}{pos}{$position}{cnt} += $_site_h->{$k2}{ipseg}{$k1}{cnt};
+                $_site_h->{$k2}{pos}{$position}{rate} += $_site_h->{$k2}{ipseg}{$k1}{rate};
+                $_site_h->{$k2}{pos}{$position}{download_rate} += $_site_h->{$k2}{ipseg}{$k1}{download_rate} if exists($_site_h->{$k2}{ipseg}{$k1}{download_rate});
+                $_site_h->{$k2}{pos}{$position}{download_cnt} += $_site_h->{$k2}{ipseg}{$k1}{download_cnt} if exists($_site_h->{$k2}{ipseg}{$k1}{download_cnt});
             }
         }
     }
@@ -105,7 +132,17 @@ sub fini()
     }
 
     # logit 
-    open(my $fp, ">site_cli_pos.txt");
+    _log_cnt_rate($self->{basedir});
+    _log_download_rate($self->{basedir});
+
+    return 1;
+}
+
+sub _log_cnt_rate($)
+{
+    my $dir = shift;
+
+    open(my $fp, ">${dir}/clipos_cnt_rate.txt");
     printf($fp "\t");
     foreach my $k (sort {$_allpos_h->{$b}<=>$_allpos_h->{$a}} keys %$_allpos_h) {
         printf($fp "${k}\t");
@@ -119,7 +156,7 @@ sub fini()
     printf($fp "\n");
 
     foreach my $k1 (keys %$_site_h) {
-        printf($fp "$k1\t"); 
+        printf($fp "$k1\t");
         foreach my $k2 (sort {$_allpos_h->{$b}<=>$_allpos_h->{$a}} keys %$_allpos_h) {
             if (exists($_site_h->{$k1}{pos}{$k2})) {
                 my $rate = _round($_site_h->{$k1}{pos}{$k2}{rate}, 2);
@@ -132,7 +169,39 @@ sub fini()
     }
 
     close($fp);
-    return 1;
+}
+
+sub _log_download_rate($)
+{
+    my $dir = shift;
+
+    open(my $fp, ">${dir}/clipos_download_rate.txt");
+    printf($fp "\t");
+    foreach my $k (sort {$_allpos_h->{$b}<=>$_allpos_h->{$a}} keys %$_allpos_h) {
+        printf($fp "${k}\t");
+    }
+    printf($fp "\n");
+
+    printf($fp "\t");
+    foreach my $k (sort {$_allpos_h->{$b}<=>$_allpos_h->{$a}} keys %$_allpos_h) {
+        printf($fp "$_allpos_h->{$k}%%\t");
+    }
+    printf($fp "\n");
+
+    foreach my $k1 (keys %$_site_h) {
+        printf($fp "$k1\t");
+        foreach my $k2 (sort {$_allpos_h->{$b}<=>$_allpos_h->{$a}} keys %$_allpos_h) {
+            if (exists($_site_h->{$k1}{pos}{$k2}{download_rate})) {
+                my $rate = _round($_site_h->{$k1}{pos}{$k2}{download_rate} / $_site_h->{$k1}{pos}{$k2}{download_cnt} / 1024, 2);
+                printf($fp "$rate\t");
+            } else {
+                printf($fp "0\t");
+            }
+        }
+        printf($fp "\n");
+    }
+
+    close($fp);
 }
 
 sub destroy()
@@ -143,7 +212,7 @@ sub destroy()
     #printf(Dumper($_allip_h));
 }
 
-sub debug($)
+sub log($)
 {
     my $self = shift;
     my $str = shift;
