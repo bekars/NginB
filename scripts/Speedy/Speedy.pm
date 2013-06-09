@@ -17,6 +17,7 @@ sub new()
     my $class = ref($invocant) || $invocant;
     my $self = {
         'basedir' => '/tmp',
+        'debug' => 0,
         @_,
     };
 
@@ -29,6 +30,12 @@ sub set_basedir($)
 {
     my $self = shift;
     $self->{basedir} = shift;
+}
+
+sub set_debug_on()
+{
+    my $self = shift;
+    $self->{debug} = 1;
 }
 
 sub _get_ipseg($)
@@ -60,7 +67,7 @@ sub destory()
     my $self = shift;
 }
 
-sub debug($)
+sub log($)
 {
     my $self = shift;
     my $str = shift;
