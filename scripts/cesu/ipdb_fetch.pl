@@ -16,7 +16,7 @@ my $dbh = BMD::DBH->new(
 
 $dbh->execute("set names utf8");
 
-my ($start_ipseg, $end_ipseg);
+my ($start_ipseg, $end_ipseg) = (1, 255);
 GetOptions(
     'start|s=i' => \$start_ipseg,
     'end|e=i' => \$end_ipseg,

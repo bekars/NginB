@@ -10,6 +10,7 @@ use 5.010;
 use Speedy::Utils;
 use Data::Dumper;
 use BMD::DBH;
+use BMD::IPOS;
 use Time::Interval;
 use Getopt::Long;
 use Smart::Comments;
@@ -26,6 +27,7 @@ $yesterday =~ tr/\n//d;
 #$today     = "2013-05-25";
 
 my $dbh;
+my $ipos_hld;
 my $do_db = 0;
 my $do_analysis = 0;
 my $do_debug = 0;
@@ -373,6 +375,9 @@ sub cluster_rate_log($$$$$$$)
 
     return 0 if is_out_cluster($ipseg);
 
+    my $ipos = $ipos_hld->query($ipseg);
+    my $ipos_str = $ipos_hld->format($ipos);
+
     if (($date_base ne '') && ($date_comp ne '')) {
         my $rate = $rate_comp - $rate_base;
         my $percent = ($perc_comp + $perc_base) / 2;
@@ -380,10 +385,10 @@ sub cluster_rate_log($$$$$$$)
         my $flag = 0;
 
         if ($effect < -0.5) {
-            printf($analysis_fp "[$ipseg 性能下降]\n");
+            printf($analysis_fp "[$ipseg($ipos_str) 性能下降]\n");
             $flag = 1;
         } elsif ($effect > 0.5) {
-            printf($analysis_fp "[$ipseg 性能提高]\n");
+            printf($analysis_fp "[$ipseg($ipos_str) 性能提高]\n");
             $flag = 1;
         }
 
@@ -411,16 +416,16 @@ sub cluster_rate_log($$$$$$$)
         my $delta_percent = $perc_comp - $perc_base;
         my $delta_rate = ($rate_comp * $delta_percent / 100);
         if ($delta_percent > DELTA_PERCENT && $rate_comp > 0) {
-            printf($analysis_fp "[$ipseg 调入导致性能提高]\n");
+            printf($analysis_fp "[$ipseg($ipos_str) 调入导致性能提高]\n");
             $flag = 1;
         } elsif ($delta_percent > DELTA_PERCENT && $rate_comp < 0) {
-            printf($analysis_fp "[$ipseg 调入导致性能下降]\n");
+            printf($analysis_fp "[$ipseg($ipos_str) 调入导致性能下降]\n");
             $flag = 1;
         } elsif ($delta_percent < NEG_DELTA_PERCENT && $rate_base < 0) {
-            printf($analysis_fp "[$ipseg 调出导致性能提高]\n");
+            printf($analysis_fp "[$ipseg($ipos_str) 调出导致性能提高]\n");
             $flag = 1;
         } elsif ($delta_percent < NEG_DELTA_PERCENT && $rate_base > 0) {
-            printf($analysis_fp "[$ipseg 调出导致性能下降]\n");
+            printf($analysis_fp "[$ipseg($ipos_str) 调出导致性能下降]\n");
             $flag = 1;
         }
 
@@ -438,9 +443,9 @@ sub cluster_rate_log($$$$$$$)
         my $effect = $rate_base * $perc_base / 100;
         if ($effect > 1 || $effect < -1) {
             if ($rate_base > 0) {
-                printf($analysis_fp "[$ipseg 调出导致性能下降]\n");
+                printf($analysis_fp "[$ipseg($ipos_str) 调出导致性能下降]\n");
             } else {
-                printf($analysis_fp "[$ipseg 调出导致性能提高]\n");
+                printf($analysis_fp "[$ipseg($ipos_str) 调出导致性能提高]\n");
             }
 
             printf($analysis_fp "性能变化差值: %.2f%%\n" . 
@@ -456,9 +461,9 @@ sub cluster_rate_log($$$$$$$)
         my $effect = $rate_comp * $perc_comp / 100;
         if ($effect > 1 || $effect < -1) {
             if ($rate_comp > 0) {
-                printf($analysis_fp "[$ipseg 调入导致性能提高]\n");
+                printf($analysis_fp "[$ipseg($ipos_str) 调入导致性能提高]\n");
             } else {
-                printf($analysis_fp "[$ipseg 调入导致性能下降]\n");
+                printf($analysis_fp "[$ipseg($ipos_str) 调入导致性能下降]\n");
             }
 
             printf($analysis_fp "性能变化差值: %.2f%%\n" . 
@@ -520,12 +525,16 @@ sub cluster_slow_log($$)
     LOOP: for (my $i = 0; $i <= $#$recs; $i++) {
         next LOOP if is_out_cluster($recs->[$i][COM_IPSEG]);
 
+        my $ipos = $ipos_hld->query($recs->[$i][COM_IPSEG]);
+        my $ipos_str = $ipos_hld->format($ipos);
+
         $sql = qq/select total_rate from cluster_cesu_daily where ipseg='$recs->[$i][COM_IPSEG]' and time like '$yesterday %'/;
         my $yesterday_rate = $dbh->query_count($sql);
         $yesterday_rate = 0 if !$yesterday_rate;
 
-        printf($analysis_fp "[机房: %s]\n比源站慢: %.2f%%\n占测速比重: %.2f%%\n%s此机房比源站慢: %.2f%%\n\n",
+        printf($analysis_fp "[机房: %s(%s)]\n比源站慢: %.2f%%\n占测速比重: %.2f%%\n%s此机房比源站慢: %.2f%%\n\n",
             $recs->[$i][COM_IPSEG],
+            $ipos_str,
             $recs->[$i][COM_TOTAL_RATE],
             $recs->[$i][COM_PERCENT],
             $yesterday, $yesterday_rate,
@@ -726,6 +735,9 @@ $dbh = BMD::DBH->new(
     'dbname' => 'speed',
     'dbport' => 3306
 );
+
+$ipos_hld = BMD::IPOS->new();
+$ipos_hld->load("/opt");
 
 my @adjsite = (
 '029.iseeyu.com',
