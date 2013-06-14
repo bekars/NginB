@@ -23,7 +23,7 @@ sub new()
     };
 
     $dbh = DBI->connect("DBI:mysql:database=$self->{dbname};host=$self->{dbhost};user=$self->{dbuser};password=$self->{dbpass};port=$self->{dbport}") 
-        or die("ConnDB err: " . DBI->errstr);
+        or printf("ConnDB err: " . DBI->errstr);
     
     $self->{dbh} = $dbh;
 
@@ -36,9 +36,8 @@ sub _query($)
     my $sql = shift;
     my $data_ref = ();
     my @row;
-    if (!defined($sql)) {
-        return;
-    }
+    return if (!defined($sql));
+    return if (!$dbh);
 
     #printf("RUNSQL: %s\n", $sql);
     my $sth = $dbh->prepare($sql);
@@ -74,6 +73,7 @@ sub _dosql($)
 {
     my $sql = shift;
     #printf("RUNSQL: $sql\n");
+    return if (!$dbh);
     $dbh->do($sql) or printf("SQL err: [$sql]" . "(" . length($sql) .")");
 }
 

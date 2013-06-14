@@ -737,7 +737,7 @@ $dbh = BMD::DBH->new(
 );
 
 $ipos_hld = BMD::IPOS->new();
-$ipos_hld->load("/opt");
+$ipos_hld->load("/home/apuadmin/baiyu/");
 
 my @adjsite = (
 '029.iseeyu.com',

@@ -31,15 +31,17 @@ my $debuglog = 0;
 my %mod_h = ();
 
 
-my $clipos_m = Speedy::ClientPos->new();
-$clipos_m->set_basedir("/var/log");
-$clipos_m->init();
+my $clipos_hld = Speedy::ClientPos->new();
+$clipos_hld->set_debug_on();
 
 
 sub mod_init
 {
     $mod_h{date} = $log_time;
     $mod_h{dir} = "SPD_$log_time";
+
+    $clipos_hld->set_basedir("/tmp");
+    $clipos_hld->init();
 
 =pod
     ttl_analysis_init(\%mod_h);
@@ -164,7 +166,7 @@ sub analysis_url
 
 #
 # Log Format
-# 127.0.0.1 - - [27/Nov/2012:12:10:59 +0800] "GET http://www.google-analytics.com/__utm.gif?utmwv=5.3.8&utms=1&utmn=2097981030&utmhn=www.anquanbao.com HTTP/1.1" 200 35 "http://www.anquanbao.com/" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:17.0) Gecko/17.0 Firefox/17.0" "-" "-" MISS "Wed, 19 Apr 2000 11:43:00 GMT" "private, no-cache, no-cache=Set-Cookie, proxy-revalidate" "AAAAAAAAAAA" "Wed, 21 Jan 2004 19:51:30 GMT" 0.085 0.085 "-"
+# 127.0.0.1 chn-jx-jy-sb1.24467-52715356-1 remote_user [27/Nov/2012:12:10:59 +0800] "GET http://www.google-analytics.com/utm.gif?utmwv=5.3.8&utms=1&utmn=2097981030&utmhn=www.anquanbao.com HTTP/1.1" 200 35 "http://www.anquanbao.com/" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:17.0) Gecko/17.0 Firefox/17.0" "x_forward" "cookie" HIT "Wed, 19 Apr 2000 11:43:00 GMT" "private, no-cache, no-cache=Set-Cookie, proxy-revalidate" "etag" "Wed, 21 Jan 2004 19:51:30 GMT" 0.085 0.085 "req_body"
 #
 # log_format main 
 #   $remote_addr $hostname $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" 
@@ -172,9 +174,9 @@ sub analysis_url
 #   "$upstream_http_expires" "$upstream_http_cache_control" "$upstream_http_etag" "$upstream_http_last_modified"
 #   $request_time $upstream_response_time "$request_body";
 #
-my $log_reg = qr/^(?# REMOTE_IP)(.*?)\s+(?# CLUSTER)(.*?)\.(?# THREAD)(.*?)\s+.*?\[(?# TIME)(.*?)\]\s+\"(?# URI)(.*?)\"\s+(?# HTTP_STATUS)(.*?)\s+(?# HTTP_LEN)(.*?)\s+\"[^\"]*\"\s+\"(?# AGENT)(.*?)\"\s+\"[^\"]*\"\s+\"[^\"]*\"\s+(?# CACHE_STATUS)(.*?)\s+\"(?# EXPIRED)(.*?)\"\s+\"(?# CACHE_CONTROL)(.*?)\"\s+\"(?# ETAG)(.*?)\"\s+\"(?# LAST_MODIFIED)(.*?)\"\s+.*/;
+my $log_reg = qr/^(?# REMOTE_IP)(.*?)\s+(?# CLUSTER)(.*?)\.(?# THREAD)(.*?)\s+(?# REMOTE_USER)(.*?)\s+\[(?# TIME)(.*?)\]\s+\"(?# URI)(.*?)\"\s+(?# HTTP_STATUS)(.*?)\s+(?# BODY_LEN)(.*?)\s+\"(?# REFER)(.*?)\"\s+\"(?# AGENT)(.*?)\"\s+\"(?# X_FORWARD)(.*?)\"\s+\"(?# COOKIE)(.*?)\"\s+(?# CACHE_STATUS)(.*?)\s+\"(?# EXPIRED)(.*?)\"\s+\"(?# CACHE_CONTROL)(.*?)\"\s+\"(?# ETAG)(.*?)\"\s+\"(?# LAST_MODIFIED)(.*?)\"\s+(?# REQ_TIME)(.*?)\s+(?# UPSTREAM_TIME)(.*?)\s+\"(?# REQ_BODY)(.*?)\".*/;
 
-use constant {REMOTE_IP=>0, CLUSTER=>1, THREAD=>2, TIME=>3, URL=>4, STATUS=>5, LENGTH=>6, AGENT=>7, CACHE_STATUS=>8, EXPIRED=>9, CACHE_CONTROL=>10, ETAG=>11, LAST_MODIFIED=>12};
+use constant {REMOTE_IP=>0, CLUSTER=>1, THREAD=>2, REMOTE_USER=>3, TIME=>4, URL=>5, HTTP_STATUS=>6, BODY_LEN=>7, REFER=>8, AGENT=>9, X_FORWARD=>10, COOKIE=>11, CACHE_STATUS=>12, EXPIRED=>13, CACHE_CONTROL=>14, ETAG=>15, LAST_MODIFIED=>16, REQ_TIME=>17, UPSTREAM_TIME=>18, REQ_BODY=>19};
 
 #
 # log_data_a : log reg word segment
@@ -194,26 +196,34 @@ sub analysis
         log             => $log,
         remote_ip       => $log_data_a->[REMOTE_IP],
         cluster         => $log_data_a->[CLUSTER],
+        thread          => $log_data_a->[THREAD],
+        remote_user     => $log_data_a->[REMOTE_USER],
         time            => $log_data_a->[TIME],
         http_method     => $http_method,
         http_url        => $http_url,
         http_arg        => $http_arg,
         http_suffix     => $http_suffix,
-        http_status     => $log_data_a->[STATUS],
-        http_len        => $log_data_a->[LENGTH],
+        http_status     => $log_data_a->[HTTP_STATUS],
+        body_len        => $log_data_a->[BODY_LEN],
+        refer           => $log_data_a->[REFER],
         agent           => $log_data_a->[AGENT],
+        x_forward       => $log_data_a->[X_FORWARD],
+        cookie          => $log_data_a->[COOKIE],
         cache_status    => $log_data_a->[CACHE_STATUS],
         cache_expired   => $log_data_a->[EXPIRED],
         cache_control   => $log_data_a->[CACHE_CONTROL],
         http_etag       => $log_data_a->[ETAG],
         http_lastmodify => $log_data_a->[LAST_MODIFIED],
+        req_time        => $log_data_a->[REQ_TIME],
+        upstream_time   => $log_data_a->[UPSTREAM_TIME],
+        req_body        => $log_data_a->[REQ_BODY],
     );
     
     if ($debug) {
         dump_mod(\%node_h);
     }
 
-    $clipos_m->analysis(\%node_h);
+    $clipos_hld->analysis(\%node_h);
 
 =pod
     nocache_analysis_mod(\%node_h);
@@ -418,8 +428,8 @@ if (exists($options{f})) {
     walk_dir($home_dir, "log.$log_time", \&parse_log);
 }
 
-$clipos_m->fini();
-$clipos_m->destroy();
+$clipos_hld->fini();
+#$clipos_hld->destroy();
 
 =pod
 my $result_file = sprintf("%s/analysis_%s.result", $mod_h{dir}, $mod_h{date});

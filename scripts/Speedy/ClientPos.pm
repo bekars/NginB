@@ -17,9 +17,38 @@ use Data::Dumper;
 #
 # site broswer position
 #
+
+# KEY: site 
+#   "ipseg"
+#       ipseg
+#           "cnt"               - ip段访问次数
+#           "rate"              - ip段访问次数比例
+#           "download_rate"     - ip段下载速率
+#           "download_cnt"      - ip段下载次数
+#   "pos"
+#       position
+#           "cnt"               - ip段访问次数
+#           "rate"              - ip段访问次数比例
+#           "download_rate"     - ip段下载速率
+#           "download_cnt"      - ip段下载次数
 my $_site_h = {};
-my $_allip_h = {};
-my $_allpos_h = {};
+
+# KEY: cluster
+#   "ipseg"
+#       ipseg
+#           "cnt"
+#           "rate"
+#           "download_rate"
+#           "download_cnt"
+#   "pos"
+#       position
+#           "cnt"               - ip段访问次数
+#           "rate"              - ip段访问次数比例
+#           "download_rate"     - ip段下载速率
+#           "download_cnt"      - ip段下载次数
+my $_cluster_h = {};
+
+my $_ipos = undef;
 
 sub new()
 {
@@ -54,12 +83,16 @@ sub analysis($)
 
     my $ipseg = _get_ipseg($node_h->{remote_ip});
     $_site_h->{$node_h->{domain}}{ipseg}{$ipseg}{cnt} += 1;
+    $_cluster_h->{$node_h->{cluster}}{ipseg}{$ipseg}{cnt} += 1;
 
     # calculte download rate
     my $drate = _download_rate($node_h);
     if ($drate > 0) {
         $_site_h->{$node_h->{domain}}{ipseg}{$ipseg}{download_rate} += $drate;
         $_site_h->{$node_h->{domain}}{ipseg}{$ipseg}{download_cnt} += 1;
+        
+        $_cluster_h->{$node_h->{cluster}}{ipseg}{$ipseg}{download_rate} += $drate;
+        $_cluster_h->{$node_h->{cluster}}{ipseg}{$ipseg}{download_cnt} += 1;
     }
 
     return 1;
@@ -72,94 +105,132 @@ sub _private()
 sub init()
 {
     my $self = shift;
-    my $ipos = BMD::IPOS->new();
-    $ipos->load2("/opt/");
-    $self->{ipos} = $ipos;
+    $_ipos = BMD::IPOS->new();
+    $_ipos->load("/home/apuadmin/baiyu/");
+    $self->{ipos} = $_ipos;
 }
 
 sub fini()
 {
     my $self = shift;
-    my $total = 0;
+    # analysis ip and region
+    _analysis_ip_region($_site_h, $self);
 
-    # calculate rate for all ip in sites
-    foreach my $k1 (keys %$_site_h) {
-        $total = 0;
-        my $ipseg_h = $_site_h->{$k1}{ipseg};
-        
-        foreach my $k2 (keys %$ipseg_h) {
-            $total += $ipseg_h->{$k2}{cnt};
-        }
- 
-        foreach my $k3 (keys %$ipseg_h) {
-            $ipseg_h->{$k3}{rate} = _round(($ipseg_h->{$k3}{cnt} * 100 / $total), 2);
-            $_allip_h->{$k3} += $ipseg_h->{$k3}{cnt};
+    # analysis client position
+    _analysis_clipos("site", $_site_h, $self);
+    _analysis_clipos("cluster", $_cluster_h, $self);
+}
+
+my $_ip_pos_h = {};
+
+sub _analysis_ip_region($$)
+{
+    my ($data_h, $self) = @_;
+    my $allip_h = {};
+   
+    # find all kind ipseg
+    foreach my $k1 (keys %$data_h) {
+        my $ipseg_h = $data_h->{$k1}{ipseg};
+        foreach my $kipseg (keys %$ipseg_h) {
+            $allip_h->{$kipseg} += $ipseg_h->{$kipseg}{cnt};
         }
     }
-
-    printf(Dumper($_site_h));
-
-    # ip => pos
-    my $ip_cnt = keys %$_allip_h;
+    
+    my $ip_cnt = keys %$allip_h;
     my $n = 0;
-    foreach my $k1 (sort keys %$_allip_h) {
-        my ($country, $province, $isp) = $self->{ipos}->query2($k1);
-        my $position = "${province}_${isp}";
+    foreach my $k1 (sort keys %$allip_h) {
+        my $ipos = $_ipos->query($k1);
+        my $position = $_ipos->format($ipos);
 
         $n += 1;
-        printf("$n/$ip_cnt $country, $province, $isp\n") if $self->{debug};
+        printf("$n/$ip_cnt\t$k1\t$position\n") if $self->{debug};
 
-        $_allpos_h->{$position} += $_allip_h->{$k1};
-    
-        foreach my $k2 (keys %$_site_h) {
-            if (exists($_site_h->{$k2}{ipseg}{$k1})) {
-                $_site_h->{$k2}{pos}{$position}{cnt} += $_site_h->{$k2}{ipseg}{$k1}{cnt};
-                $_site_h->{$k2}{pos}{$position}{rate} += $_site_h->{$k2}{ipseg}{$k1}{rate};
-                $_site_h->{$k2}{pos}{$position}{download_rate} += $_site_h->{$k2}{ipseg}{$k1}{download_rate} if exists($_site_h->{$k2}{ipseg}{$k1}{download_rate});
-                $_site_h->{$k2}{pos}{$position}{download_cnt} += $_site_h->{$k2}{ipseg}{$k1}{download_cnt} if exists($_site_h->{$k2}{ipseg}{$k1}{download_cnt});
-            }
-        }
+        $_ip_pos_h->{$k1} = $position;
     }
-    
-    # calculate all region rate
-    $total = 0;
-    foreach my $k (keys %$_allpos_h) {
-        $total += $_allpos_h->{$k}
-    }
-
-    foreach my $k (keys %$_allpos_h) {
-        $_allpos_h->{$k} = _round(($_allpos_h->{$k} * 100 / $total), 2);
-    }
-
-    # logit 
-    _log_cnt_rate($self->{basedir});
-    _log_download_rate($self->{basedir});
 
     return 1;
 }
 
-sub _log_cnt_rate($)
+sub _analysis_clipos($$$)
 {
-    my $dir = shift;
+    my ($name, $data_h, $self) = @_;
+    my $total = 0;
+    my $allip_h = {};
+    my $allpos_h = {};
 
-    open(my $fp, ">${dir}/clipos_cnt_rate.txt");
+    # 计算每个网站在各个ip段的访问百分比
+    foreach my $k1 (keys %$data_h) {
+        $total = 0;
+        my $ipseg_h = $data_h->{$k1}{ipseg};
+        
+        foreach my $kipseg (keys %$ipseg_h) {
+            $total += $ipseg_h->{$kipseg}{cnt};
+        }
+ 
+        foreach my $kipseg (keys %$ipseg_h) {
+            $ipseg_h->{$kipseg}{rate} = _round(($ipseg_h->{$kipseg}{cnt} * 100 / $total), 2);
+            
+            # 统计不同ip段地址
+            $allip_h->{$kipseg} += $ipseg_h->{$kipseg}{cnt};
+        }
+    }
+
+    # 将ip段地址转成物理位置
+    foreach my $k1 (sort keys %$allip_h) {
+        my $position = $_ip_pos_h->{$k1};
+
+        # 统计各物理位置访问次数
+        $allpos_h->{$position} += $allip_h->{$k1};
+    
+        # 按每个站统计各物理位置访问，同区域ip段数据合并累计
+        foreach my $k2 (keys %$data_h) {
+            if (exists($data_h->{$k2}{ipseg}{$k1})) {
+                $data_h->{$k2}{pos}{$position}{cnt} += $data_h->{$k2}{ipseg}{$k1}{cnt};
+                $data_h->{$k2}{pos}{$position}{rate} += $data_h->{$k2}{ipseg}{$k1}{rate};
+                $data_h->{$k2}{pos}{$position}{download_rate} += $data_h->{$k2}{ipseg}{$k1}{download_rate} if exists($data_h->{$k2}{ipseg}{$k1}{download_rate});
+                $data_h->{$k2}{pos}{$position}{download_cnt} += $data_h->{$k2}{ipseg}{$k1}{download_cnt} if exists($data_h->{$k2}{ipseg}{$k1}{download_cnt});
+            }
+        }
+    }
+    
+    # 计算各区域总访问数和比例
+    $total = 0;
+    foreach my $k (keys %$allpos_h) {
+        $total += $allpos_h->{$k}
+    }
+    foreach my $k (keys %$allpos_h) {
+        $allpos_h->{$k} = _round(($allpos_h->{$k} * 100 / $total), 2);
+    }
+
+    # write to log file
+    _log_cnt_pos($name, $allpos_h, $data_h, $self);
+    _log_download_pos($name, $allpos_h, $data_h, $self);
+
+    return 1;
+}
+
+sub _log_cnt_pos($$$$)
+{
+    my ($name, $allpos_h, $data_h, $self) = @_;
+
+    open(my $fp, ">$self->{basedir}/${name}_cnt_pos.txt");
     printf($fp "\t");
-    foreach my $k (sort {$_allpos_h->{$b}<=>$_allpos_h->{$a}} keys %$_allpos_h) {
+    foreach my $k (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
         printf($fp "${k}\t");
     }
     printf($fp "\n");
 
     printf($fp "\t");
-    foreach my $k (sort {$_allpos_h->{$b}<=>$_allpos_h->{$a}} keys %$_allpos_h) {
-        printf($fp "$_allpos_h->{$k}%%\t");
+    foreach my $k (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
+        printf($fp "$allpos_h->{$k}%%\t");
     }
     printf($fp "\n");
 
-    foreach my $k1 (keys %$_site_h) {
+    foreach my $k1 (keys %$data_h) {
         printf($fp "$k1\t");
-        foreach my $k2 (sort {$_allpos_h->{$b}<=>$_allpos_h->{$a}} keys %$_allpos_h) {
-            if (exists($_site_h->{$k1}{pos}{$k2})) {
-                my $rate = _round($_site_h->{$k1}{pos}{$k2}{rate}, 2);
+        foreach my $k2 (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
+            if (exists($data_h->{$k1}{pos}{$k2})) {
+                my $rate = _round($data_h->{$k1}{pos}{$k2}{rate}, 2);
                 printf($fp "$rate\t");
             } else {
                 printf($fp "0\t");
@@ -171,28 +242,28 @@ sub _log_cnt_rate($)
     close($fp);
 }
 
-sub _log_download_rate($)
+sub _log_download_pos($$$$)
 {
-    my $dir = shift;
+    my ($name, $allpos_h, $data_h, $self) = @_;
 
-    open(my $fp, ">${dir}/clipos_download_rate.txt");
+    open(my $fp, ">$self->{basedir}/${name}_download_pos.txt");
     printf($fp "\t");
-    foreach my $k (sort {$_allpos_h->{$b}<=>$_allpos_h->{$a}} keys %$_allpos_h) {
+    foreach my $k (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
         printf($fp "${k}\t");
     }
     printf($fp "\n");
 
     printf($fp "\t");
-    foreach my $k (sort {$_allpos_h->{$b}<=>$_allpos_h->{$a}} keys %$_allpos_h) {
-        printf($fp "$_allpos_h->{$k}%%\t");
+    foreach my $k (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
+        printf($fp "$allpos_h->{$k}%%\t");
     }
     printf($fp "\n");
 
-    foreach my $k1 (keys %$_site_h) {
+    foreach my $k1 (keys %$data_h) {
         printf($fp "$k1\t");
-        foreach my $k2 (sort {$_allpos_h->{$b}<=>$_allpos_h->{$a}} keys %$_allpos_h) {
-            if (exists($_site_h->{$k1}{pos}{$k2}{download_rate})) {
-                my $rate = _round($_site_h->{$k1}{pos}{$k2}{download_rate} / $_site_h->{$k1}{pos}{$k2}{download_cnt} / 1024, 2);
+        foreach my $k2 (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
+            if (exists($data_h->{$k1}{pos}{$k2}{download_rate})) {
+                my $rate = _round($data_h->{$k1}{pos}{$k2}{download_rate} / $data_h->{$k1}{pos}{$k2}{download_cnt} / 1024, 2);
                 printf($fp "$rate\t");
             } else {
                 printf($fp "0\t");
@@ -208,8 +279,6 @@ sub destroy()
 {
     my $self = shift;
     $self->{ipos}->destroy();
-    #printf(Dumper($_site_h));
-    #printf(Dumper($_allip_h));
 }
 
 sub log($)
