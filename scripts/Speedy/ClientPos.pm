@@ -84,7 +84,11 @@ sub analysis($)
     $_site_h->{$node_h->{domain}}{ipseg}{$ipseg}{cnt} += 1;
     
     $cluster_h = $_aqb->get_cluster_info($node_h->{cluster});
-    $cluster = "$node_h->{cluster}($cluster_h->{location})";
+    if ($cluster_h) {
+        $cluster = "$node_h->{cluster}($cluster_h->{location})";
+    } else {
+        $cluster = "$node_h->{cluster}";
+    }
     $_cluster_h->{$cluster}{ipseg}{$ipseg}{cnt} += 1;
 
     # calculte download rate
@@ -219,7 +223,7 @@ sub _log_cnt_pos($$$$)
 {
     my ($name, $allpos_h, $data_h, $self) = @_;
 
-    open(my $fp, ">$self->{basedir}/${name}_cnt_pos.txt");
+    open(my $fp, ">$self->{basedir}/pos_${name}_cnt.txt");
     printf($fp "客户端区域\t");
     foreach my $k (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
         printf($fp "${k}\t");
@@ -252,7 +256,7 @@ sub _log_download_pos($$$$)
 {
     my ($name, $allpos_h, $data_h, $self) = @_;
 
-    open(my $fp, ">$self->{basedir}/${name}_download_pos.txt");
+    open(my $fp, ">$self->{basedir}/pos_${name}_download.txt");
     printf($fp "客户端区域\t");
     foreach my $k (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
         printf($fp "${k}\t");
