@@ -13,7 +13,6 @@ use BMD::HTTP;
 use JSON -support_by_pp;
 use Storable;
 
-my $dbh;
 my $debug = 1;
 
 sub new()
@@ -152,6 +151,10 @@ sub format($)
     my $self = shift;
     my $ipos = shift;
     my $pos_str = "";
+
+    if (!exists($ipos->{isp})) {
+        return $ipos->{ip};
+    }
 
     $ipos->{isp} = "NA" if ($ipos->{isp} eq "");
 

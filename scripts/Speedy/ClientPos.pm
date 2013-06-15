@@ -5,12 +5,12 @@ require Exporter;
 use vars qw($VERSION @EXPORT @EXPORT_OK @ISA);
 
 use strict;
-use Speedy::Speedy;
-use BMD::IPOS;
-use DBI;
 use autodie;
 use Try::Tiny;
 use Data::Dumper;
+use Speedy::Speedy;
+use BMD::IPOS;
+use BMD::AQB;
 
 @ISA = qw(Speedy::Speedy);
 
@@ -49,6 +49,7 @@ my $_site_h = {};
 my $_cluster_h = {};
 
 my $_ipos = undef;
+my $_aqb = undef;
 
 sub new()
 {
@@ -75,24 +76,27 @@ sub _download_rate($)
 sub analysis($)
 {
     my $self = shift;
-
     my $node_h = shift;
-    if (!defined($node_h)) {
-        return;
-    }
+    return if (!defined($node_h));
+    my ($cluster_h, $cluster);
 
     my $ipseg = _get_ipseg($node_h->{remote_ip});
     $_site_h->{$node_h->{domain}}{ipseg}{$ipseg}{cnt} += 1;
-    $_cluster_h->{$node_h->{cluster}}{ipseg}{$ipseg}{cnt} += 1;
+    
+    $cluster_h = $_aqb->get_cluster_info($node_h->{cluster});
+    $cluster = "$node_h->{cluster}($cluster_h->{location})";
+    $_cluster_h->{$cluster}{ipseg}{$ipseg}{cnt} += 1;
 
     # calculte download rate
     my $drate = _download_rate($node_h);
     if ($drate > 0) {
         $_site_h->{$node_h->{domain}}{ipseg}{$ipseg}{download_rate} += $drate;
         $_site_h->{$node_h->{domain}}{ipseg}{$ipseg}{download_cnt} += 1;
-        
-        $_cluster_h->{$node_h->{cluster}}{ipseg}{$ipseg}{download_rate} += $drate;
-        $_cluster_h->{$node_h->{cluster}}{ipseg}{$ipseg}{download_cnt} += 1;
+
+        $cluster_h = $_aqb->get_cluster_info($node_h->{cluster});
+        $cluster = "$node_h->{cluster}($cluster_h->{location})";
+        $_cluster_h->{$cluster}{ipseg}{$ipseg}{download_rate} += $drate;
+        $_cluster_h->{$cluster}{ipseg}{$ipseg}{download_cnt} += 1;
     }
 
     return 1;
@@ -108,6 +112,8 @@ sub init()
     $_ipos = BMD::IPOS->new();
     $_ipos->load("/home/apuadmin/baiyu/");
     $self->{ipos} = $_ipos;
+    $_aqb = BMD::AQB->new();
+    $self->{aqb} = $_aqb;
 }
 
 sub fini()
@@ -214,13 +220,13 @@ sub _log_cnt_pos($$$$)
     my ($name, $allpos_h, $data_h, $self) = @_;
 
     open(my $fp, ">$self->{basedir}/${name}_cnt_pos.txt");
-    printf($fp "\t");
+    printf($fp "客户端区域\t");
     foreach my $k (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
         printf($fp "${k}\t");
     }
     printf($fp "\n");
 
-    printf($fp "\t");
+    printf($fp "区域访问百分比\t");
     foreach my $k (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
         printf($fp "$allpos_h->{$k}%%\t");
     }
@@ -247,13 +253,13 @@ sub _log_download_pos($$$$)
     my ($name, $allpos_h, $data_h, $self) = @_;
 
     open(my $fp, ">$self->{basedir}/${name}_download_pos.txt");
-    printf($fp "\t");
+    printf($fp "客户端区域\t");
     foreach my $k (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
         printf($fp "${k}\t");
     }
     printf($fp "\n");
 
-    printf($fp "\t");
+    printf($fp "区域访问百分比\t");
     foreach my $k (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
         printf($fp "$allpos_h->{$k}%%\t");
     }

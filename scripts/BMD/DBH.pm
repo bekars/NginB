@@ -7,7 +7,7 @@ use DBI;
 use autodie;
 use Try::Tiny;
 
-my $dbh;
+my $_dbh;
 
 sub new()
 {
@@ -22,10 +22,10 @@ sub new()
         @_,
     };
 
-    $dbh = DBI->connect("DBI:mysql:database=$self->{dbname};host=$self->{dbhost};user=$self->{dbuser};password=$self->{dbpass};port=$self->{dbport}") 
+    $_dbh = DBI->connect("DBI:mysql:database=$self->{dbname};host=$self->{dbhost};user=$self->{dbuser};password=$self->{dbpass};port=$self->{dbport}") 
         or printf("ConnDB err: " . DBI->errstr);
     
-    $self->{dbh} = $dbh;
+    $self->{dbh} = $_dbh;
 
     bless($self, $class);
     return $self;
@@ -37,10 +37,10 @@ sub _query($)
     my $data_ref = ();
     my @row;
     return if (!defined($sql));
-    return if (!$dbh);
+    return if (!$_dbh);
 
     #printf("RUNSQL: %s\n", $sql);
-    my $sth = $dbh->prepare($sql);
+    my $sth = $_dbh->prepare($sql);
     $sth->execute() or printf("SQL err: [$sql]" . "(" . length($sql) .")" . $sth->errstr);
     while (@row = $sth->fetchrow_array) {
         my @recs = @row;
@@ -73,11 +73,11 @@ sub _dosql($)
 {
     my $sql = shift;
     #printf("RUNSQL: $sql\n");
-    return if (!$dbh);
-    $dbh->do($sql) or printf("SQL err: [$sql]" . "(" . length($sql) .")");
+    return if (!$_dbh);
+    $_dbh->do($sql) or printf("SQL err: [$sql]" . "(" . length($sql) .")");
 }
 
-sub isnumeric($)
+sub _isnumeric($)
 {
     my $val = shift;
     if (!$val) {
@@ -102,7 +102,7 @@ sub insert($$)
     foreach my $key (sort keys %$data) {
         push(@col, $key);
 
-        if (isnumeric($data->{$key})) {
+        if (_isnumeric($data->{$key})) {
             push(@val, $data->{$key});
         } else {
             push(@val, "\'$data->{$key}\'");
@@ -114,6 +114,12 @@ sub insert($$)
 }
 
 sub fini()
+{
+    my $self = shift;
+    $self->{dbh}->disconnect();
+}
+
+sub destroy()
 {
     my $self = shift;
     $self->{dbh}->disconnect();
