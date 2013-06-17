@@ -40,7 +40,7 @@ sub mod_init
     $mod_h{date} = $log_time;
     $mod_h{dir} = "SPD_$log_time";
 
-    $clipos_hld->set_basedir("/tmp");
+    $clipos_hld->set_basedir("/home/apuadmin/baiyu");
     $clipos_hld->init();
 
 =pod
@@ -190,12 +190,15 @@ sub analysis
     $log =~ s/%/%%/g;
 
     my ($http_method, $http_url, $http_arg, $http_suffix) = analysis_url($log_data_a->[URL]);
+    $log_data_a->[CLUSTER] =~ m/(.*)-.*/;
+    my ($cluster_room) = $1;
  
     my %node_h = (
         domain          => $domain,
         log             => $log,
         remote_ip       => $log_data_a->[REMOTE_IP],
         cluster         => $log_data_a->[CLUSTER],
+        cluster_room    => $cluster_room,
         thread          => $log_data_a->[THREAD],
         remote_user     => $log_data_a->[REMOTE_USER],
         time            => $log_data_a->[TIME],

@@ -33,7 +33,7 @@ use BMD::AQB;
 #           "download_cnt"      - ip段下载次数
 my $_site_h = {};
 
-# KEY: cluster
+# KEY: cluster_room
 #   "ipseg"
 #       ipseg
 #           "cnt"
@@ -78,18 +78,18 @@ sub analysis($)
     my $self = shift;
     my $node_h = shift;
     return if (!defined($node_h));
-    my ($cluster_h, $cluster);
+    my ($cluster_info, $cluster_str);
 
     my $ipseg = _get_ipseg($node_h->{remote_ip});
     $_site_h->{$node_h->{domain}}{ipseg}{$ipseg}{cnt} += 1;
     
-    $cluster_h = $_aqb->get_cluster_info($node_h->{cluster});
-    if ($cluster_h) {
-        $cluster = "$node_h->{cluster}($cluster_h->{location})";
+    $cluster_info = $_aqb->get_cluster_info($node_h->{cluster});
+    if ($cluster_info) {
+        $cluster_str = "$node_h->{cluster_room}($cluster_info->{location})";
     } else {
-        $cluster = "$node_h->{cluster}";
+        $cluster_str = "$node_h->{cluster_room}";
     }
-    $_cluster_h->{$cluster}{ipseg}{$ipseg}{cnt} += 1;
+    $_cluster_h->{$cluster_str}{ipseg}{$ipseg}{cnt} += 1;
 
     # calculte download rate
     my $drate = _download_rate($node_h);
@@ -97,10 +97,8 @@ sub analysis($)
         $_site_h->{$node_h->{domain}}{ipseg}{$ipseg}{download_rate} += $drate;
         $_site_h->{$node_h->{domain}}{ipseg}{$ipseg}{download_cnt} += 1;
 
-        $cluster_h = $_aqb->get_cluster_info($node_h->{cluster});
-        $cluster = "$node_h->{cluster}($cluster_h->{location})";
-        $_cluster_h->{$cluster}{ipseg}{$ipseg}{download_rate} += $drate;
-        $_cluster_h->{$cluster}{ipseg}{$ipseg}{download_cnt} += 1;
+        $_cluster_h->{$cluster_str}{ipseg}{$ipseg}{download_rate} += $drate;
+        $_cluster_h->{$cluster_str}{ipseg}{$ipseg}{download_cnt} += 1;
     }
 
     return 1;
