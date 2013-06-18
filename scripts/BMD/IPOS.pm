@@ -52,7 +52,7 @@ sub query($)
     $ipos = _query_net($ip);
     return $ipos if $ipos;
 
-    printf("ERR: $ip NOT FOUND !\n");
+    printf("ERR: ip ($ip) NOT FOUND !\n");
     return;
 }
 
@@ -152,9 +152,7 @@ sub format($)
     my $ipos = shift;
     my $pos_str = "";
 
-    if (!exists($ipos->{isp})) {
-        return $ipos->{ip};
-    }
+    return $ipos->{ip} if (!exists($ipos->{isp}));
 
     $ipos->{isp} = "NA" if ($ipos->{isp} eq "");
 
@@ -175,30 +173,22 @@ sub format($)
     return $pos_str;
 }
 
-sub destroy()
+sub format_region($)
 {
     my $self = shift;
-}
+    my $ipos = shift;
+    my $pos_str = "";
+    return $ipos->{ip} if (!exists($ipos->{isp}));
 
-sub get_country_byid($)
-{
-    my $self = shift;
-    my $id = shift;
-    return $self->{country}->{$id};
-}
+    $ipos->{isp} = "NA" if ($ipos->{isp} eq "");
 
-sub get_province_byid($)
-{
-    my $self = shift;
-    my $id = shift;
-    return $self->{province}->{$id};
-}
+    if ($ipos->{region} ne "") {
+        $pos_str = "$ipos->{region}_$ipos->{isp}";
+    } else {
+        $pos_str = "$ipos->{country}";
+    }
 
-sub get_isp_byid($)
-{
-    my $self = shift;
-    my $id = shift;
-    return $self->{isp}->{$id};
+    return $pos_str;
 }
 
 sub generate_ip_hash_file($)
@@ -229,6 +219,11 @@ sub generate_ip_hash_file($)
     close($ipfp);
 
     store(\%ipref, $store_file);
+}
+
+sub destroy()
+{
+    my $self = shift;
 }
 
 sub BEGIN

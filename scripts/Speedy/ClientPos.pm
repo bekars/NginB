@@ -64,7 +64,7 @@ sub _download_rate($)
 
     if (($node_h->{cache_status} eq "HIT") &&
         ($node_h->{http_status} eq "200") && 
-        ($node_h->{body_len} > 1000) && 
+        ($node_h->{body_len} > 2000) && 
         ($node_h->{req_time} > 0.01)) 
     {
         return _round(($node_h->{body_len} / $node_h->{req_time}), 2);
@@ -146,9 +146,11 @@ sub _analysis_ip_region($$)
     
     my $ip_cnt = keys %$allip_h;
     my $n = 0;
-    foreach my $k1 (sort keys %$allip_h) {
+    LOOP: foreach my $k1 (sort keys %$allip_h) {
+        next LOOP if (!$k1);
+
         my $ipos = $_ipos->query($k1);
-        my $position = $_ipos->format($ipos);
+        my $position = $_ipos->format_region($ipos);
 
         $n += 1;
         printf("$n/$ip_cnt\t$k1\t$position\n") if $self->{debug};
@@ -172,11 +174,11 @@ sub _analysis_clipos($$$)
         my $ipseg_h = $data_h->{$k1}{ipseg};
         
         foreach my $kipseg (keys %$ipseg_h) {
-            $total += $ipseg_h->{$kipseg}{cnt};
+            $total += $ipseg_h->{$kipseg}{cnt} if $kipseg;
         }
  
         foreach my $kipseg (keys %$ipseg_h) {
-            $ipseg_h->{$kipseg}{rate} = _round(($ipseg_h->{$kipseg}{cnt} * 100 / $total), 2);
+            $ipseg_h->{$kipseg}{rate} = ($ipseg_h->{$kipseg}{cnt} * 100 / $total);
             
             # 统计不同ip段地址
             $allip_h->{$kipseg} += $ipseg_h->{$kipseg}{cnt};
@@ -184,7 +186,9 @@ sub _analysis_clipos($$$)
     }
 
     # 将ip段地址转成物理位置
-    foreach my $k1 (sort keys %$allip_h) {
+    LOOP: foreach my $k1 (sort keys %$allip_h) {
+        next LOOP if (!$k1);
+
         my $position = $_ip_pos_h->{$k1};
 
         # 统计各物理位置访问次数
@@ -202,16 +206,16 @@ sub _analysis_clipos($$$)
     }
     
     # 计算各区域总访问数和比例
-    $total = 0;
+    my $total_cnt = 0;
     foreach my $k (keys %$allpos_h) {
-        $total += $allpos_h->{$k}
+        $total_cnt += $allpos_h->{$k}
     }
     foreach my $k (keys %$allpos_h) {
-        $allpos_h->{$k} = _round(($allpos_h->{$k} * 100 / $total), 2);
+        $allpos_h->{$k} = _round(($allpos_h->{$k} * 100 / $total_cnt), 2);
     }
 
     # write to log file
-    _log_cnt_pos($name, $allpos_h, $data_h, $self);
+    _log_cnt_pos($name, $allpos_h, $data_h, $total_cnt, $self);
     _log_download_pos($name, $allpos_h, $data_h, $self);
 
     return 1;
@@ -219,23 +223,29 @@ sub _analysis_clipos($$$)
 
 sub _log_cnt_pos($$$$)
 {
-    my ($name, $allpos_h, $data_h, $self) = @_;
+    my ($name, $allpos_h, $data_h, $total_cnt, $self) = @_;
+    my $total = 0;
 
     open(my $fp, ">$self->{basedir}/pos_${name}_cnt.txt");
-    printf($fp "客户端区域\t");
+    printf($fp "客户端区域\t所有区域\t");
     foreach my $k (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
         printf($fp "${k}\t");
     }
     printf($fp "\n");
 
-    printf($fp "区域访问百分比\t");
+    printf($fp "区域访问百分比\t$total_cnt\t");
     foreach my $k (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
         printf($fp "$allpos_h->{$k}%%\t");
     }
     printf($fp "\n");
 
     foreach my $k1 (keys %$data_h) {
-        printf($fp "$k1\t");
+        $total = 0;
+        foreach my $k2 (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
+            $total += $data_h->{$k1}{pos}{$k2}{cnt} if (exists($data_h->{$k1}{pos}{$k2}));
+        }
+
+        printf($fp "$k1\t$total\t");
         foreach my $k2 (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
             if (exists($data_h->{$k1}{pos}{$k2})) {
                 my $rate = _round($data_h->{$k1}{pos}{$k2}{rate}, 2);
