@@ -191,7 +191,7 @@ sub analysis
 
     my ($http_method, $http_url, $http_arg, $http_suffix) = analysis_url($log_data_a->[URL]);
     $log_data_a->[CLUSTER] =~ m/(.*)-.*/;
-    my ($cluster_room) = $1;
+    my ($cluster_room) = $1 ? $1 : $log_data_a->[CLUSTER];
  
     my %node_h = (
         domain          => $domain,
