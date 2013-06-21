@@ -11,6 +11,8 @@ use Data::Dumper;
 use Speedy::Speedy;
 use BMD::IPOS;
 use BMD::AQB;
+use BMD::EXCEL;
+use BMD::MAIL;
 
 @ISA = qw(Speedy::Speedy);
 
@@ -31,6 +33,9 @@ use BMD::AQB;
 #           "rate"              - ip段访问次数比例
 #           "download_rate"     - ip段下载速率
 #           "download_cnt"      - ip段下载次数
+#   "total"
+#       "cnt"                   - 总访问次数
+#       "rate"                  - 总访问比例
 my $_site_h = {};
 
 # KEY: cluster_room
@@ -46,16 +51,19 @@ my $_site_h = {};
 #           "rate"              - ip段访问次数比例
 #           "download_rate"     - ip段下载速率
 #           "download_cnt"      - ip段下载次数
+#   "total"
+#       "cnt"                   - 总访问次数
+#       "rate"                  - 总访问比例
 my $_cluster_h = {};
 
 # KEY: region
 #   "cluster"
 #       cluster
-#           "cnt"
-#           "rate"
+#           "cnt"               - 访问cluster次数
+#           "rate"              - 访问cluster比例
 #   "total"
-#       "cnt"
-#       "rate"
+#       "cnt"                   - 总访问次数
+#       "rate"                  - 总访问比例
 my $_region_h = {};
 
 my $_ipos = undef;
@@ -154,15 +162,26 @@ sub init()
 sub fini()
 {
     my $self = shift;
+    my $file_xls = "/home/apuadmin/baiyu/client_pos.xls";
+
     # analysis ip and region
     _analysis_ip_region($_site_h, $self);
 
+    my $excel_hld = BMD::EXCEL->new(filename=>"$file_xls");
+    $self->{excel_hld} = $excel_hld;
+
     # analysis client position
-    _analysis_clipos("site", $_site_h, $self);
-    _analysis_clipos("cluster", $_cluster_h, $self);
+    _analysis_clipos("节点", $_cluster_h, $self);
+    _analysis_clipos("源站", $_site_h, $self);
 
     # analysis region => cluster
-    _analysis_region("region", $_cluster_h, $self);
+    _analysis_region("区域访问节点", $_cluster_h, $self);
+    
+    $self->{excel_hld}->destroy();
+
+    my $mail = BMD::MAIL->new();
+    $mail->send_mail("dnspod访问区域和下载速度", "dnspod访问区域和下载速度统计数据", $file_xls);
+    $mail->destroy();
 }
 
 # ip => region
@@ -245,7 +264,50 @@ sub _analysis_region($$$)
 
     _log_region($name, $cluster_h, $_region_h, $self);
 
+    _log_region_excel($name, $cluster_h, $_region_h, $self);
+
     return 1;
+}
+
+sub _log_region_excel($$$$)
+{
+    my ($name, $cluster_h, $region_h, $self) = @_;
+    my ($row, $col) = (0, 0);
+
+    my $excel_hld = $self->{excel_hld};
+    my $sheet = $excel_hld->add_sheet("$name");
+    $excel_hld->set_column_width($sheet, 0, 0, 16);
+    $excel_hld->set_column_width($sheet, 2, 1000, 17);
+
+    $excel_hld->write($sheet, $row, $col, "客户端位置\\机房", "black", "yellow");
+    ++$col;
+    $excel_hld->write($sheet, $row, $col, "访问比例", "black", "cyan");
+    foreach my $kclu (sort keys %$cluster_h) {
+        ++$col;
+        $excel_hld->write($sheet, $row, $col, "$kclu", "black", "yellow");
+    }
+ 
+    foreach my $kreg (sort {$region_h->{$b}{total}{rate} <=> $region_h->{$a}{total}{rate}} keys %$region_h) {
+        $col = 0;
+        ++$row;
+        $excel_hld->write($sheet, $row, $col, "$kreg");
+        ++$col;
+        $excel_hld->write($sheet, $row, $col, "$region_h->{$kreg}{total}{rate}%", "black", "cyan", "right");
+        
+        foreach my $kclu (sort keys %$cluster_h) {
+            ++$col;
+            if (exists($region_h->{$kreg}{cluster}{$kclu}{rate})) {
+                my $rate = _round($region_h->{$kreg}{cluster}{$kclu}{rate}, 2);
+                if ($rate >= 5) {
+                    $excel_hld->write($sheet, $row, $col, "${rate}%", "black", "pink");
+                } else {
+                    $excel_hld->write($sheet, $row, $col, "${rate}%");
+                }
+            } else {
+                $excel_hld->write($sheet, $row, $col, "N/A");
+            }
+        }
+    }
 }
 
 sub _analysis_clipos($$$)
@@ -302,11 +364,91 @@ sub _analysis_clipos($$$)
         $allpos_h->{$k} = _round(($allpos_h->{$k} * 100 / $total_cnt), 2);
     }
 
+    # 计算各节点/源站访问总次数和比例
+    foreach my $k1 (keys %$data_h) {
+        $total = 0;
+        foreach my $k2 (keys %$allpos_h) {
+            $total += $data_h->{$k1}{pos}{$k2}{cnt} if (exists($data_h->{$k1}{pos}{$k2}{cnt}));
+        }
+        $data_h->{$k1}{total}{cnt}  = $total;
+        $data_h->{$k1}{total}{rate} = _round($total * 100 / $total_cnt, 2);
+    }
+
     # write to log file
     _log_cnt_pos($name, $allpos_h, $data_h, $total_cnt, $self);
     _log_download_pos($name, $allpos_h, $data_h, $self);
 
+    _log_cnt_download_excel($name, $allpos_h, $data_h, $total_cnt, $self);
     return 1;
+}
+
+sub _log_cnt_download_excel($$$$)
+{
+    my ($name, $allpos_h, $data_h, $total_cnt, $self) = @_;
+    my ($row, $col, $total) = (0, 0, 0);
+
+    my $excel_hld = $self->{excel_hld};
+    my $sheet = $excel_hld->add_sheet("$name(下载速度|访问比例)");
+    $excel_hld->set_column_width($sheet, 0, 0, 20);
+    $excel_hld->set_column_width($sheet, 2, 1000, 12);
+
+    $excel_hld->write($sheet, $row, $col, "客户端区域", "black", "yellow");
+    ++$col;
+    $excel_hld->write($sheet, $row, $col, "访问比例", "black", "cyan");
+    foreach my $k (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
+        ++$col;
+        $excel_hld->write($sheet, $row, $col, "$k", "black", "yellow");
+    }
+    
+    $col = 0;
+    ++$row;
+    $excel_hld->write($sheet, $row, $col, "区域访问百分比", "black", "yellow");
+    ++$col;
+    $excel_hld->write($sheet, $row, $col, $total_cnt, "black", "cyan");
+    foreach my $k (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
+        ++$col;
+        $excel_hld->write($sheet, $row, $col, "$allpos_h->{$k}%", "black", "yellow");
+    }
+
+    foreach my $k1 (sort {$data_h->{$b}{total}{rate}<=>$data_h->{$a}{total}{rate}} keys %$data_h) {
+        $col = 0;
+        ++$row;
+        $excel_hld->write($sheet, $row, $col, "$k1");
+        ++$col;
+        $excel_hld->write($sheet, $row, $col, "$data_h->{$k1}{total}{rate}%", "black", "cyan", "right");
+        foreach my $k2 (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
+            ++$col;
+            my ($rate, $drate);
+            if (exists($data_h->{$k1}{pos}{$k2}{rate})) {
+                $rate = _round($data_h->{$k1}{pos}{$k2}{rate}, 2);
+            } else {
+                $rate = 0;
+            }
+                
+            if (exists($data_h->{$k1}{pos}{$k2}{download_rate})) {
+                $drate = _round($data_h->{$k1}{pos}{$k2}{download_rate} / $data_h->{$k1}{pos}{$k2}{download_cnt} / 1024, 2);
+            } else {
+                $drate = 0;
+            }
+
+            #
+            # over 5% visit and download rate < 100 is bad
+            #
+            if (($rate >= 5) && ($drate > 0 && $drate < 100)) {
+                $excel_hld->write($sheet, $row, $col, "${drate}|${rate}%", "black", "red");
+            } else {
+                if ($rate >= 5) {
+                    $excel_hld->write($sheet, $row, $col, "${drate}|${rate}%", "black", "pink");
+                } else {
+                    if (!$rate && !$drate) {
+                        $excel_hld->write($sheet, $row, $col, "");
+                    } else {
+                        $excel_hld->write($sheet, $row, $col, "${drate}|${rate}%");
+                    }
+                }
+            }
+        }
+    }
 }
 
 sub _log_region($$$)
@@ -314,7 +456,7 @@ sub _log_region($$$)
     my ($name, $cluster_h, $region_h, $self) = @_;
 
     open(my $fp, ">$self->{basedir}/pos_${name}_cnt.txt");
-    printf($fp "机房\t访问总量\t");
+    printf($fp "客户端位置\\机房\t占总访问量百分比\t");
     foreach my $kclu (sort keys %$cluster_h) {
         printf($fp "${kclu}\t");
     }
@@ -322,7 +464,7 @@ sub _log_region($$$)
 
     foreach my $kreg (sort {$region_h->{$b}{total}{rate} <=> $region_h->{$a}{total}{rate}} keys %$region_h) {
 
-        printf($fp "$kreg\t$region_h->{$kreg}{total}{rate}\t");
+        printf($fp "$kreg\t$region_h->{$kreg}{total}{rate}%%\t");
         foreach my $kclu (sort keys %$cluster_h) {
             if (exists($region_h->{$kreg}{cluster}{$kclu})) {
                 my $rate = _round($region_h->{$kreg}{cluster}{$kclu}{rate}, 2);
@@ -358,12 +500,12 @@ sub _log_cnt_pos($$$$)
     foreach my $k1 (keys %$data_h) {
         $total = 0;
         foreach my $k2 (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
-            $total += $data_h->{$k1}{pos}{$k2}{cnt} if (exists($data_h->{$k1}{pos}{$k2}));
+            $total += $data_h->{$k1}{pos}{$k2}{cnt} if (exists($data_h->{$k1}{pos}{$k2}{cnt}));
         }
 
         printf($fp "$k1\t$total\t");
         foreach my $k2 (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
-            if (exists($data_h->{$k1}{pos}{$k2})) {
+            if (exists($data_h->{$k1}{pos}{$k2}{rate})) {
                 my $rate = _round($data_h->{$k1}{pos}{$k2}{rate}, 2);
                 printf($fp "$rate\t");
             } else {

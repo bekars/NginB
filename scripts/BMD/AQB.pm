@@ -131,6 +131,8 @@ sub get_site_info($)
     my $site_h = undef;
     my $conf_h = undef;
     
+    return $self->{site}{$name} if exists($self->{site}{$name});
+
     my $sql = qq/select id,ip,type,dns,domain_id,rev,whole_name from records where whole_name="$name"/;
     _conn_db();
     my $recs = $_dbh->query($sql);
@@ -144,6 +146,7 @@ sub get_site_info($)
         $site_h->{'whole_name'} = $recs->[0][RECORD_WHOLENAME];
     } else {
         printf("ERR: site ($name) no find in db!\n");
+        $self->{site}{$name} = undef;
         return;
     }
 
@@ -168,7 +171,8 @@ sub get_site_info($)
     $site_h->{'config'} = $conf_h;
     _close_db();
     
-    return $site_h;
+    $self->{site}{$name} = $site_h;
+    return $self->{site}{$name};
 }
 
 use constant {

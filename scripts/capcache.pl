@@ -190,8 +190,10 @@ sub analysis
     $log =~ s/%/%%/g;
 
     my ($http_method, $http_url, $http_arg, $http_suffix) = analysis_url($log_data_a->[URL]);
-    $log_data_a->[CLUSTER] =~ m/(.*)-.*/;
-    my ($cluster_room) = $1 ? $1 : $log_data_a->[CLUSTER];
+    my $cluster_room = $log_data_a->[CLUSTER];
+    if ($log_data_a->[CLUSTER] =~ m/(.*)-.*/) {
+        $cluster_room = $1;
+    }
  
     my %node_h = (
         domain          => $domain,
@@ -222,8 +224,8 @@ sub analysis
         req_body        => $log_data_a->[REQ_BODY],
     );
     
-    if ($debug) {
-        dump_mod(\%node_h);
+    if ($debug && ($node_h{remote_ip} eq "58.213.145.34")) {
+        print(Dumper(\%node_h));
     }
 
     $clipos_hld->analysis(\%node_h);

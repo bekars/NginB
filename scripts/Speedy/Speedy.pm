@@ -16,8 +16,9 @@ sub new()
     my $invocant = shift;
     my $class = ref($invocant) || $invocant;
     my $self = {
-        'basedir' => '/tmp',
-        'debug' => 0,
+        'basedir'  => '/tmp',
+        'filename' => 'speedy',
+        'debug'    => 0,
         @_,
     };
 
@@ -30,6 +31,12 @@ sub set_basedir($)
 {
     my $self = shift;
     $self->{basedir} = shift;
+}
+
+sub set_filename($)
+{
+    my $self = shift;
+    $self->{filename} = shift;
 }
 
 sub set_debug_on()

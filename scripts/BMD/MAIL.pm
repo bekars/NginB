@@ -50,7 +50,7 @@ sub _send_mail($$$$)
     $attach =~ m/.*\/(.*?)$/;
     my $filename = $1;
     $msg->attach(
-        Type     => 'text/plain',
+        Type     => 'AUTO',
         Path     => $attach,
         Filename => $filename,
     );
@@ -74,6 +74,9 @@ sub _send_mail($$$$)
 sub send_mail($$$$)
 {
     my ($self, $title, $content, $attach, $mailto_arr) = @_;
+    if (!$mailto_arr) {
+        return _send_mail($title, $content, $attach, \@my_email);
+    }
     return _send_mail($title, $content, $attach, $mailto_arr);
 }
 
@@ -82,8 +85,10 @@ sub destroy()
     my $self = shift;
 }
 
+=pod
 say "send mail to " . join(', ', @my_email) . "...";
 _send_mail("DIDI", "CONTENT", "/tmp/pos_cluster_download.txt", \@my_email);
+=cut
 
 1;
 
