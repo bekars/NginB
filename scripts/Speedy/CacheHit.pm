@@ -1,3 +1,4 @@
+#!/usr/bin/perl -w
 ###################################################
 ## Speedy::CacheHit
 ##
@@ -5,233 +6,229 @@
 ## analysis cache resource
 ###################################################
 
-
-## Global Stuff ###################################
-package	Speedy::CacheHit;
-use strict;
-require	Exporter;
-
-use Speedy::TTL qw(&get_maxage_interval &get_expired_interval);
-use Speedy::Utils;
-
+package Speedy::CacheHit;
+require Exporter;
 use vars qw($VERSION @EXPORT @EXPORT_OK @ISA);
-@ISA 		= qw(Exporter);
-@EXPORT		= qw(%cache_hit_h %cache_http_status_h %cache_expired_h);
-@EXPORT_OK	= qw(&cachehit_analysis_mod &cachehit_analysis_init &cachehit_result);
-$VERSION	= '1.0.0';
 
-## statistic intervals ############################
-our %cache_hit_h = ();
-our %cache_http_status_h = ();
-our %cache_expired_h = ();
+use strict;
+use autodie;
+use Try::Tiny;
+use Data::Dumper;
+use Speedy::Speedy;
+use BMD::EXCEL;
+use BMD::MAIL;
 
-my $log_result = "%s/cachehit_%s.result";
-my $site_result = "%s/cache_site_%s.result";
-my $domain_flag = "";
-my %cachehit_site_h = ();
+@ISA = qw(Speedy::Speedy);
 
-my $miss_result = "%s/miss_%s.result";
-my $miss_fp;
+#
+# {site}
+#       site
+#           {cnt}
+#           {flow}
+#           {miss}
+#           {miss_flow}
+#           {hit}
+#           {hit_flow}
+#           {expire}
+#           {expire_flow}
+#           {nocache}
+#           {nocache_flow}
+#           {cachehit}
+#           {cachehit_flow}
+#           {cacherate}
+#           {cacherate_flow}
+# {total}
+#       {cnt}
+#       {flow}
+#       {miss}
+#       {miss_flow}
+#       {hit}
+#       {hit_flow}
+#       {expire}
+#       {expire_flow}
+#       {nocache}
+#       {nocache_flow}
+#       {cachehit}
+#       {cachehit_flow}
+#       {cacherate}
+#       {cacherate_flow}
+#
+my $_cachehit = undef;
 
-sub cache_expired_analysis
+sub new()
 {
+    my $self = Speedy::Speedy->new(mod=>'CacheHit', filename=>'cachehit.txt');
+    $self->{cachehit} = $_cachehit;
+    bless($self);
+    return $self;
+}
+
+sub analysis($)
+{
+    my $self = shift;
     my $node_h = shift;
-    if (!defined($node_h)) {
-        return;
-    }
+    return if (!defined($node_h));
 
-    my $interval = 1;
+    $node_h->{cache_status} = 'nocache' if $node_h->{cache_status} eq "-";
+    $node_h->{cache_status} =~ tr/[A-Z]/[a-z]/;
 
-    if ((($node_h->{cache_control} eq "-") || 
-        ($node_h->{cache_control} eq "")) &&
-        (($node_h->{cache_expired} eq "-") || 
-        ($node_h->{cache_expired} eq "")))
+    if (($node_h->{http_status} eq "404") ||
+        ($node_h->{cache_control} =~ m/private|no-cache|no-store/i) ||
+        ($node_h->{agent} =~ m/aqb_prefetch/i) ||
+        ($node_h->{agent} =~ m/aqb-monitor/i))
     {
-        $cache_expired_h{TOTAL} += 1;
-        $cache_expired_h{TOTAL_FLOW} += $node_h->{http_len};
         return;
     }
 
-    if (($node_h->{cache_control} ne "-") &&
-        ($node_h->{cache_control} ne "")) {
-        $interval = get_maxage_interval($node_h->{cache_control});
-    }
-    elsif (($node_h->{cache_expired} ne "-") &&
-        ($node_h->{cache_expired} ne "")) {
-        $interval = get_expired_interval($node_h->{cache_expired}, $node_h->{time});
-    }
+    $_cachehit->{total}{cnt} += 1;
+    $_cachehit->{total}{flow} += $node_h->{body_len};
+    $_cachehit->{total}{"$node_h->{cache_status}"} += 1;
+    $_cachehit->{total}{"$node_h->{cache_status}_flow"} += $node_h->{body_len};
 
-    if ($interval <= 0) {
-        $cache_expired_h{TOTAL} += 1;
-        $cache_expired_h{TOTAL_FLOW} += $node_h->{http_len};
-    }
+    $_cachehit->{site}{"$node_h->{domain}"}{cnt} += 1;
+    $_cachehit->{site}{"$node_h->{domain}"}{flow} += $node_h->{body_len};
+    $_cachehit->{site}{"$node_h->{domain}"}{"$node_h->{cache_status}"} += 1;
+    $_cachehit->{site}{"$node_h->{domain}"}{"$node_h->{cache_status}_flow"} += $node_h->{body_len};
+
+    return 1;
 }
 
-sub cachehit_analysis_init($)
+sub init()
 {
-    my $mod_h = shift;
-    if (!defined($mod_h)) {
-        return;
-    }
-
-    $log_result = sprintf($log_result, $mod_h->{dir}, $mod_h->{date});
-    $site_result = sprintf($site_result, $mod_h->{dir}, $mod_h->{date});
-
-    $miss_result = sprintf($miss_result, $mod_h->{dir}, $mod_h->{date});
-    open($miss_fp, ">$miss_result");
+    my $self = shift;
 }
 
-sub cachehit_site
+sub _cal_hitrate($)
 {
-    my ($cache_site_h, $node_h) = @_;
-    
-    $cache_site_h->{$node_h->{cache_status}} += 1;
-    $cache_site_h->{TOTAL} += 1;
-    $cache_site_h->{"$node_h->{cache_status}" . "_FLOW"} += $node_h->{http_len};
-    $cache_site_h->{TOTAL_FLOW} += $node_h->{http_len};
+    my $data = shift;
+    my $hitrate = undef;
+    my ($hit, $miss, $expired, $nocache, $hit_flow, $miss_flow, $expired_flow, $nocache_flow, $total, $total_flow) = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+    $data->{hit}           = 0 if (!exists($data->{hit}));
+    $data->{miss}          = 0 if (!exists($data->{miss}));
+    $data->{expired}       = 0 if (!exists($data->{expired}));
+    $data->{nocache}       = 0 if (!exists($data->{nocache}));
+    $data->{hit_flow}      = 0 if (!exists($data->{hit_flow}));
+    $data->{miss_flow}     = 0 if (!exists($data->{miss_flow}));
+    $data->{expired_flow}  = 0 if (!exists($data->{expired_flow}));
+    $data->{nocache_flow}  = 0 if (!exists($data->{nocache_flow}));
+
+    $hit          = $data->{hit}; 
+    $miss         = $data->{miss}; 
+    $expired      = $data->{expired};
+    $nocache      = $data->{nocache};
+    $hit_flow     = $data->{hit_flow};
+    $miss_flow    = $data->{miss_flow};
+    $expired_flow = $data->{expired_flow};
+    $nocache_flow = $data->{nocache_flow};
+        
+    $total = ($hit + $miss + $expired);
+    $total_flow = ($hit_flow + $miss_flow + $expired_flow);
+
+    if (0 == $total) {
+        $data->{cachehit} = -1;
+    } else {
+        $data->{cachehit} = _round($hit * 100 / $total);
+    }
+
+    if (0 == $total_flow) {
+        $data->{cachehit_flow} = -1;
+    } else {
+        $data->{cachehit_flow} = _round($hit_flow * 100 / $total_flow);
+    }
+
+    if ((0 == $data->{cnt}) || (0 == $data->{flow})) 
+    {
+        $data->{cacherate} = -1;
+        $data->{cacherate_flow} = -1;
+    } else {
+        $data->{cacherate} = _round($hit * 100 / $data->{cnt});
+        $data->{cacherate_flow} = _round($hit_flow * 100 / $data->{flow});
+    }
+
+    return $data;
 }
 
-sub cachehit_analysis_mod($)
+sub _log_file($$$)
 {
-    my $node_h = shift;
-    if (!defined($node_h)) {
-        return;
-    }
-
-    #if (($node_h->{cache_status} eq "-") ||
-    #    ($node_h->{cache_status} eq "")) {
-    #    return;
-    #}
-
-    if ($node_h->{http_status} eq "404") {
-        return;
-    }
-
-    if ($node_h->{cache_control} =~ m/private|no-cache|no-store/i) {
-        return;
-    }
-
-    if ($node_h->{cache_status} eq "") {
-        $node_h->{cache_status} = "NULL";
-    }
-
-    if ($node_h->{agent} =~ m/aqb_prefetch/) {
-        return;
-    }
-    
-    $cache_hit_h{$node_h->{cache_status}} += 1;
-    $cache_hit_h{TOTAL} += 1;
-    $cache_hit_h{"$node_h->{cache_status}" . "_FLOW"} += $node_h->{http_len};
-    $cache_hit_h{TOTAL_FLOW} += $node_h->{http_len};
-    $cache_http_status_h{$node_h->{http_status}} += 1;
-    $cache_http_status_h{TOTAL} += 1;
-    $cache_http_status_h{"$node_h->{http_status}" . "_FLOW"} += $node_h->{http_len};
-    $cache_http_status_h{TOTAL_FLOW} += $node_h->{http_len};
-
-    # record miss log
-    if ($node_h->{cache_status} eq "MISS") {
-        my $log = $node_h->{log};
-        $log =~ tr/%/#/;
-        $log =~ tr/\n//d;
-        printf($miss_fp "$log  $node_h->{domain}\n");
-    }
-
-    cache_expired_analysis($node_h);
-
-    # cachehit for per site
-    if ($domain_flag ne $node_h->{domain}) {
-        my %cache_site_h = ();
-        $cache_site_h{'-'} = 0;
-        $cache_site_h{'-_FLOW'} = 0;
-        $cache_site_h{'HIT'} = 0;
-        $cache_site_h{'HIT_FLOW'} = 0;
-        $cache_site_h{'MISS'} = 0;
-        $cache_site_h{'MISS_FLOW'} = 0;
-        $cache_site_h{'EXPIRED'} = 0;
-        $cache_site_h{'EXPIRED_FLOW'} = 0;
-        $cache_site_h{'TOTAL'} = 0;
-        $cache_site_h{'TOTAL_FLOW'} = 0;
-        $cachehit_site_h{$node_h->{domain}} = \%cache_site_h;
-        $domain_flag = $node_h->{domain};
-    }
-
-    cachehit_site($cachehit_site_h{$node_h->{domain}}, $node_h);
+    my ($fp, $name, $data) = @_;
+    printf($fp "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", 
+        $name,
+        $data->{cachehit}, 
+        $data->{cachehit_flow}, 
+        $data->{cacherate}, 
+        $data->{cacherate_flow}, 
+        $data->{hit}, 
+        $data->{hit_flow}, 
+        $data->{miss}, 
+        $data->{miss_flow}, 
+        $data->{expired}, 
+        $data->{expired_flow}, 
+        $data->{nocache}, 
+        $data->{nocache_flow}, 
+        $data->{cnt}, 
+        $data->{flow}
+    );
 }
 
-sub cachehit_result
+sub fini()
 {
-    if (!exists($cache_hit_h{HIT})) {
-        return 0;
-    }
-
-    open(CACHESITE_FILE, ">$site_result") or return;
-
+    my $self = shift;
     my $total = 0;
     my $total_flow = 0;
-    foreach my $key (keys %cachehit_site_h) {
-        $total = ($cachehit_site_h{$key}->{HIT} + $cachehit_site_h{$key}->{MISS} + $cachehit_site_h{$key}->{EXPIRED});
-        if (0 == $total) {
-            $cachehit_site_h{$key}->{HITRATE} = -1;
-        } else {
-            $cachehit_site_h{$key}->{HITRATE} = $cachehit_site_h{$key}->{HIT} * 100 / $total;
-        }
 
-        $total_flow = ($cachehit_site_h{$key}->{HIT_FLOW} + $cachehit_site_h{$key}->{MISS_FLOW} + $cachehit_site_h{$key}->{EXPIRED_FLOW});
-        if (0 == $total_flow) {
-            $cachehit_site_h{$key}->{HITRATE_FLOW} = -1;
-        } else {
-            $cachehit_site_h{$key}->{HITRATE_FLOW} = $cachehit_site_h{$key}->{HIT_FLOW} * 100 / $total_flow;
-        }
+    open(my $fp, ">$self->{basedir}/$self->{filename}") or return;
 
-        if ((0 == $cachehit_site_h{$key}->{TOTAL}) ||
-            (0 == $cachehit_site_h{$key}->{TOTAL_FLOW})) {
-            $cachehit_site_h{$key}->{CACHERATE} = -1;
-            $cachehit_site_h{$key}->{CACHERATE_FLOW} = -1;
-        } else {
-            $cachehit_site_h{$key}->{CACHERATE} = $total * 100 / $cachehit_site_h{$key}->{TOTAL};
-            $cachehit_site_h{$key}->{CACHERATE_FLOW} = $total_flow * 100 / $cachehit_site_h{$key}->{TOTAL_FLOW};
-        }
-
-        printf(CACHESITE_FILE "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", 
-            $key,
-            roundFloat($cachehit_site_h{$key}->{HITRATE}), roundFloat($cachehit_site_h{$key}->{HITRATE_FLOW}), 
-            roundFloat($cachehit_site_h{$key}->{CACHERATE}), roundFloat($cachehit_site_h{$key}->{CACHERATE_FLOW}),
-            $cachehit_site_h{$key}->{HIT}, $cachehit_site_h{$key}->{MISS}, $cachehit_site_h{$key}->{EXPIRED},
-            $cachehit_site_h{$key}->{TOTAL}, $cachehit_site_h{$key}->{TOTAL_FLOW},
-        );
+    foreach my $key (sort {$_cachehit->{site}{$b}{cnt}<=>$_cachehit->{site}{$a}{cnt}} keys %{$_cachehit->{site}}) {
+        $_cachehit->{site}{$key} = _cal_hitrate($_cachehit->{site}{$key});
+        _log_file($fp, $key, $_cachehit->{site}{$key});
     }
-    close(CACHESITE_FILE);
     
-    
-    # HIT   MISS    EXPIRED     -   TOTAL   HIT_RATE    CACHE_RATE
-    $cache_hit_h{HITRATE} = $cache_hit_h{HIT} * 100 / ($cache_hit_h{HIT} + $cache_hit_h{MISS} + $cache_hit_h{EXPIRED});
-    $cache_hit_h{HITRATE_FLOW} = $cache_hit_h{HIT_FLOW} * 100 / ($cache_hit_h{HIT_FLOW} + $cache_hit_h{MISS_FLOW} + $cache_hit_h{EXPIRED_FLOW});
-    $cache_hit_h{CACHERATE} = ($cache_hit_h{HIT} + $cache_hit_h{MISS} + $cache_hit_h{EXPIRED}) * 100 / $cache_hit_h{TOTAL};
-    $cache_hit_h{CACHERATE_FLOW} = ($cache_hit_h{HIT_FLOW} + $cache_hit_h{MISS_FLOW} + $cache_hit_h{EXPIRED_FLOW}) * 100 / $cache_hit_h{TOTAL_FLOW};
-    
-    my $line = sprintf("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t" .
-                       "%s\t%s\t%s\t%s\t%s\t%s\n",
-                   $cache_hit_h{HIT}, $cache_hit_h{HIT_FLOW},
-                   $cache_hit_h{MISS}, $cache_hit_h{MISS_FLOW},
-                   $cache_hit_h{EXPIRED}, $cache_hit_h{EXPIRED_FLOW},
-                   $cache_hit_h{'-'}, $cache_hit_h{'-_FLOW'},
-                   $cache_hit_h{TOTAL}, $cache_hit_h{TOTAL_FLOW},
-                   $cache_hit_h{HITRATE}, $cache_hit_h{HITRATE_FLOW},
-                   $cache_hit_h{CACHERATE}, $cache_hit_h{CACHERATE_FLOW},
-               );
-
-    open(CACHEHIT_FILE, ">$log_result") or return;
-    printf(CACHEHIT_FILE $line);
-    close(CACHEHIT_FILE);
+    $_cachehit->{total} = _cal_hitrate($_cachehit->{total});
+    _log_file($fp, "ALL", $_cachehit->{total});
+ 
+    close($fp);
 }
 
-BEGIN
+sub send_mail()
 {
+    my $self = shift;
+    my $mail_to = [
+        'yu.bai@unlun.com',
+        #'T@unlun.com',
+        #'chao.liu@unlun.com',
+        #'chao.chen@unlun.com',
+    ];
+
+    my $site = "test.weiweimeishi.com";
+    my $mail = BMD::MAIL->new();
+    my $content = "[$site]\n总流量：\t%sMB\n节省流量：\t%sMB\n缓存率：\t%s%%\n缓存命中率：\t%s%%\n";
+    
+    foreach my $k (keys %{$_cachehit->{site}}) {
+        if ($k eq $site) {
+            my $flow = _round($_cachehit->{site}{$k}{flow} / 1024 / 1024);
+            my $flow_save = _round($flow * $_cachehit->{site}{$k}{cacherate_flow} / 100);
+
+            $content = sprintf($content, 
+                $flow, $flow_save, $_cachehit->{site}{$k}{cacherate_flow}, $_cachehit->{site}{$k}{cachehit});
+            last;
+        }
+    }
+    $mail->send_mail("火花下载每日统计20130622", $content, undef, $mail_to);
+    $mail->destroy();
 }
 
-END
+sub store()
 {
+    my $self = shift;
+}
+
+sub destroy()
+{
+    my $self = shift;
 }
 
 1;
+
+# vim: ts=4:sw=4:et
 

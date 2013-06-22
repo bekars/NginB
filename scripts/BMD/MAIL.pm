@@ -47,13 +47,15 @@ sub _send_mail($$$$)
         Data    => $content,
     );
 
-    $attach =~ m/.*\/(.*?)$/;
-    my $filename = $1;
-    $msg->attach(
-        Type     => 'AUTO',
-        Path     => $attach,
-        Filename => $filename,
-    );
+    if ($attach) {
+        $attach =~ m/.*\/(.*?)$/;
+        my $filename = $1;
+        $msg->attach(
+            Type     => 'AUTO',
+            Path     => $attach,
+            Filename => $filename,
+        );
+    }
     
     my $str = $msg->as_string() or die "convert msg to str error: $!\n";
 

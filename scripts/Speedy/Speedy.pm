@@ -16,9 +16,11 @@ sub new()
     my $invocant = shift;
     my $class = ref($invocant) || $invocant;
     my $self = {
-        'basedir'  => '/tmp',
-        'filename' => 'speedy',
-        'debug'    => 0,
+        'mod'       => "Speedy",
+        'basedir'   => '/tmp',
+        'filename'  => 'speedy.log',
+        'storefile' => 'speedy.store',
+        'debug'     => 0,
         @_,
     };
 
@@ -52,7 +54,7 @@ sub _get_ipseg($)
     return $1;
 }
 
-sub _round($$)
+sub _round
 {
     my ($float, $num) = @_;
     $num = 2 if not $num;
@@ -79,7 +81,7 @@ sub log($)
     my $self = shift;
     my $str = shift;
 
-    printf("FATHER: $str\n");
+    printf("$self->{mod}: $str\n");
 }
 
 1;

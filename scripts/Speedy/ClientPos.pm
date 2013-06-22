@@ -71,7 +71,7 @@ my $_aqb = undef;
 
 sub new()
 {
-    my $self = Speedy::Speedy->new();
+    my $self = Speedy::Speedy->new(mod=>'ClientPos', filename=>'client_pos.xls');
     bless($self);
     return $self;
 }
@@ -162,7 +162,7 @@ sub init()
 sub fini()
 {
     my $self = shift;
-    my $file_xls = "/home/apuadmin/baiyu/client_pos.xls";
+    my $file_xls = "$self->{basedir}/$self->{filename}";
 
     # analysis ip and region
     _analysis_ip_region($_site_h, $self);
@@ -178,7 +178,12 @@ sub fini()
     _analysis_region("区域访问节点", $_cluster_h, $self);
     
     $self->{excel_hld}->destroy();
+}
 
+sub send_mail()
+{
+    my $self = shift;
+    my $file_xls = "$self->{basedir}/$self->{filename}";
     my $mail = BMD::MAIL->new();
     $mail->send_mail("dnspod访问区域和下载速度", "dnspod访问区域和下载速度统计数据", $file_xls);
     $mail->destroy();
@@ -437,7 +442,7 @@ sub _log_cnt_download_excel($$$$)
             if (($rate >= 5) && ($drate > 0 && $drate < 100)) {
                 $excel_hld->write($sheet, $row, $col, "${drate}|${rate}%", "black", "red");
             } else {
-                if ($rate >= 5) {
+                if (($rate >= 5) && $drate >= 100) {
                     $excel_hld->write($sheet, $row, $col, "${drate}|${rate}%", "black", "pink");
                 } else {
                     if (!$rate && !$drate) {
@@ -555,14 +560,6 @@ sub destroy()
 {
     my $self = shift;
     $self->{ipos}->destroy();
-}
-
-sub log($)
-{
-    my $self = shift;
-    my $str = shift;
-
-    printf("CliPos: $self->{basedir} $str\n");
 }
 
 1;

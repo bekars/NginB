@@ -13,12 +13,12 @@ use Data::Dumper;
 use Date::Parse;
 use Speedy::TTL qw(&ttl_analysis_mod &ttl_analysis_init &ttl_result &get_maxage_interval &get_expired_interval %expires_h);
 use Speedy::CacheControl qw(&cachecontrol_analysis_mod &cachecontrol_analysis_init);
-use Speedy::CacheHit qw(&cachehit_analysis_mod &cachehit_analysis_init &cachehit_result %cache_hit_h %cache_http_status_h %cache_expired_h);
 use Speedy::Utils;
 use Speedy::Html qw(&html_analysis_mod &html_analysis_init %html_http_header_h);
 use IO::Handle;
 
 use Speedy::ClientPos;
+use Speedy::CacheHit;
 
 my %options = ();
 my $startime = new Benchmark;
@@ -31,17 +31,21 @@ my $debuglog = 0;
 my %mod_h = ();
 
 
-my $clipos_hld = Speedy::ClientPos->new();
-$clipos_hld->set_debug_on();
-
+my $clipos_hld = undef;
+my $cachehit_hld = undef;
 
 sub mod_init
 {
     $mod_h{date} = $log_time;
     $mod_h{dir} = "SPD_$log_time";
 
+    $clipos_hld = Speedy::ClientPos->new();
+    $clipos_hld->set_debug_on();
     $clipos_hld->set_basedir("/home/apuadmin/baiyu");
     $clipos_hld->init();
+
+    $cachehit_hld = Speedy::CacheHit->new();
+    $cachehit_hld->init();
 
 =pod
     ttl_analysis_init(\%mod_h);
@@ -229,6 +233,7 @@ sub analysis
     }
 
     $clipos_hld->analysis(\%node_h);
+    $cachehit_hld->analysis(\%node_h);
 
 =pod
     nocache_analysis_mod(\%node_h);
@@ -434,7 +439,11 @@ if (exists($options{f})) {
 }
 
 $clipos_hld->fini();
-#$clipos_hld->destroy();
+$cachehit_hld->fini();
+$cachehit_hld->send_mail();
+
+$clipos_hld->destroy();
+$cachehit_hld->destroy();
 
 =pod
 my $result_file = sprintf("%s/analysis_%s.result", $mod_h{dir}, $mod_h{date});
