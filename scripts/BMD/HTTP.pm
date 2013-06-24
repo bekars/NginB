@@ -54,8 +54,7 @@ sub query($)
 
     # looking at the results...
     if ($retcode == 0) {
-        $response_body =~ m/^${response_header}(.*)$/;
-        $response_body = $1;
+        $response_body = $1 if ($response_body =~ m/^${response_header}(.*)$/s);
         $response_header =~ s/%/%%/g;
         $response_body =~ s/%/%%/g;
 
