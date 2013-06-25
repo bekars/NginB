@@ -439,10 +439,10 @@ if (exists($options{f})) {
 }
 
 $clipos_hld->fini();
+$clipos_hld->destroy();
+
 $cachehit_hld->fini();
 $cachehit_hld->send_mail();
-
-$clipos_hld->destroy();
 $cachehit_hld->destroy();
 
 =pod

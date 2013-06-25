@@ -40,7 +40,7 @@ sub _send_mail($$$$)
     my $mail_to = join(', ', @$mailto_arr);
 
     my $msg = MIME::Lite->new(
-        From    => $mail_from,
+        From    => "yu.bai\@unlun.com",
         To      => $mail_to,
         Subject => $title,
         Type    => 'TEXT',
@@ -59,7 +59,7 @@ sub _send_mail($$$$)
     
     my $str = $msg->as_string() or die "convert msg to str error: $!\n";
 
-    my $smtp = Net::SMTP->new($mail_server, Timeout=>120, Debug=>0);
+    my $smtp = Net::SMTP->new($mail_server, Timeout=>120, Debug=>1);
     $smtp->auth($mail_user, $mail_pwd) or die "Auth Error! $!";
     $smtp->mail($mail_from);
     foreach my $kto (@$mailto_arr) {

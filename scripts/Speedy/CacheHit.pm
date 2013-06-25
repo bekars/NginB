@@ -11,7 +11,9 @@ require Exporter;
 use vars qw($VERSION @EXPORT @EXPORT_OK @ISA);
 
 use strict;
+use utf8;
 use autodie;
+use Encode;
 use Try::Tiny;
 use Data::Dumper;
 use Speedy::Speedy;
@@ -63,6 +65,8 @@ sub new()
     return $self;
 }
 
+my $_remote_ip = undef;
+my $_log_cnt = 0;
 sub analysis($)
 {
     my $self = shift;
@@ -90,6 +94,8 @@ sub analysis($)
     $_cachehit->{site}{"$node_h->{domain}"}{"$node_h->{cache_status}"} += 1;
     $_cachehit->{site}{"$node_h->{domain}"}{"$node_h->{cache_status}_flow"} += $node_h->{body_len};
 
+    $_remote_ip->{$node_h->{remote_ip}} += 1;
+    ++$_log_cnt;
     return 1;
 }
 
@@ -195,26 +201,30 @@ sub send_mail()
     my $self = shift;
     my $mail_to = [
         'yu.bai@unlun.com',
-        #'T@unlun.com',
-        #'chao.liu@unlun.com',
-        #'chao.chen@unlun.com',
     ];
 
+    my $date = `date +"%Y%m%d"`;
+    $date =~ tr/\n//d;
+    $date =~ tr/\r//d;
     my $site = "test.weiweimeishi.com";
     my $mail = BMD::MAIL->new();
-    my $content = "[$site]\n总流量：\t%sMB\n节省流量：\t%sMB\n缓存率：\t%s%%\n缓存命中率：\t%s%%\n";
+    my $content = "[$site]\n总流量：\t%sMB\n节省流量：\t%sMB\n缓存率：\t%s%%\n" . 
+                  "缓存命中率：\t%s%%\n独立访问客户端数：\t%d\n" .
+                  "总访问次数：\t%d\n";
     
     foreach my $k (keys %{$_cachehit->{site}}) {
         if ($k eq $site) {
             my $flow = _round($_cachehit->{site}{$k}{flow} / 1024 / 1024);
             my $flow_save = _round($flow * $_cachehit->{site}{$k}{cacherate_flow} / 100);
+            my $total_remote = keys %$_remote_ip;
 
             $content = sprintf($content, 
-                $flow, $flow_save, $_cachehit->{site}{$k}{cacherate_flow}, $_cachehit->{site}{$k}{cachehit});
+                $flow, $flow_save, $_cachehit->{site}{$k}{cacherate_flow}, 
+                $_cachehit->{site}{$k}{cachehit}, $total_remote, $_log_cnt);
             last;
         }
     }
-    $mail->send_mail("火花下载每日统计20130622", $content, undef, $mail_to);
+    $mail->send_mail("[火花下载]每日统计_$date", $content, undef, $mail_to);
     $mail->destroy();
 }
 
