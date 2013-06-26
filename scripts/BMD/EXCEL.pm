@@ -3,7 +3,6 @@
 package BMD::EXCEL;
 
 use strict;
-use utf8;
 use Encode;
 use autodie;
 use Try::Tiny;

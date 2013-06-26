@@ -26,10 +26,14 @@ my @mail_my = (
 sub send_mail($$$$)
 {
     my ($to_addr, $title, $filename, $to_arr) = @_;
-    my $mail_user   = 'donotreply@anquanbao.com.cn';
-    my $mail_pwd    = 'a45febb10cc82a0dce518b64d742a8f5';
-    my $mail_server = 'anquanbao.com.cn';
-    my $mail_from   = 'donotreply@anquanbao.com.cn';
+    #my $mail_user   = 'donotreply@anquanbao.com.cn';
+    #my $mail_pwd    = 'a45febb10cc82a0dce518b64d742a8f5';
+    #my $mail_server = 'anquanbao.com.cn';
+    #my $mail_from   = 'donotreply@anquanbao.com.cn';
+    my $mail_user   = 'bmdw81@163.com';
+    my $mail_pwd    = 'bmd0412';
+    my $mail_server = 'smtp.163.com';
+    my $mail_from   = 'bmdw81@163.com';
 
     my $from    = "From: yu.bai\@unlun.com\n";
     my $to      = "To: $to_addr\n";
@@ -42,7 +46,7 @@ sub send_mail($$$$)
     }
     close($fp);
 
-    my $smtp = Net::SMTP->new($mail_server);
+    my $smtp = Net::SMTP->new($mail_server, Timeout=>120, Debug=>1);
 
     $smtp->auth($mail_user, $mail_pwd) || die "Auth Error! $!";
     $smtp->mail($mail_from);

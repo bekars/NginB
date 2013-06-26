@@ -203,7 +203,7 @@ sub send_mail()
         'yu.bai@unlun.com',
     ];
 
-    my $date = `date +"%Y%m%d"`;
+    my $date = `date -d"-1 day" +"%Y%m%d"`;
     $date =~ tr/\n//d;
     $date =~ tr/\r//d;
     my $site = "test.weiweimeishi.com";

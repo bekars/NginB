@@ -208,11 +208,11 @@ sub _analysis_ip_region($$)
     my $ip_cnt = keys %$allip_h;
     my $n = 0;
     LOOP: foreach my $k1 (sort keys %$allip_h) {
-        next LOOP if (!$k1);
-
         my $ipos = $_ipos->query($k1);
-        my $position = $_ipos->format_region($ipos);
-        next LOOP if (!$position);
+
+        # 只计算电信和联通线路
+        my $position = $_ipos->format_known_isp($ipos);
+        next LOOP unless $position;
 
         $n += 1;
         printf("$n/$ip_cnt\t$k1\t$position\n") if $self->{debug};
@@ -304,7 +304,7 @@ sub _log_region_excel($$$$)
             if (exists($region_h->{$kreg}{cluster}{$kclu}{rate})) {
                 my $rate = _round($region_h->{$kreg}{cluster}{$kclu}{rate}, 2);
                 if ($rate >= 5) {
-                    $excel_hld->write($sheet, $row, $col, "${rate}%", "black", "pink");
+                    $excel_hld->write($sheet, $row, $col, "${rate}%", "black", "lime");
                 } else {
                     $excel_hld->write($sheet, $row, $col, "${rate}%");
                 }
@@ -328,10 +328,12 @@ sub _analysis_clipos($$$)
         my $ipseg_h = $data_h->{$k1}{ipseg};
         
         foreach my $kipseg (keys %$ipseg_h) {
+            next unless exists($_ip_pos_h->{$kipseg});
             $total += $ipseg_h->{$kipseg}{cnt} if $kipseg;
         }
  
         foreach my $kipseg (keys %$ipseg_h) {
+            next unless exists($_ip_pos_h->{$kipseg});
             $ipseg_h->{$kipseg}{rate} = ($ipseg_h->{$kipseg}{cnt} * 100 / $total);
             
             # 统计不同ip段地址
@@ -341,10 +343,9 @@ sub _analysis_clipos($$$)
 
     # 将ip段地址转成物理位置
     LOOP: foreach my $k1 (sort keys %$allip_h) {
-        next LOOP if (!$k1);
+        next LOOP unless exists($_ip_pos_h->{$k1});
 
         my $position = $_ip_pos_h->{$k1};
-        next LOOP if (!$position);
 
         # 统计各物理位置访问次数
         $allpos_h->{$position} += $allip_h->{$k1};
@@ -359,7 +360,7 @@ sub _analysis_clipos($$$)
             }
         }
     }
-    
+
     # 计算各区域总访问数和比例
     my $total_cnt = 0;
     foreach my $k (keys %$allpos_h) {
@@ -443,7 +444,7 @@ sub _log_cnt_download_excel($$$$)
                 $excel_hld->write($sheet, $row, $col, "${drate}|${rate}%", "black", "red");
             } else {
                 if (($rate >= 5) && $drate >= 100) {
-                    $excel_hld->write($sheet, $row, $col, "${drate}|${rate}%", "black", "pink");
+                    $excel_hld->write($sheet, $row, $col, "${drate}|${rate}%", "black", "lime");
                 } else {
                     if (!$rate && !$drate) {
                         $excel_hld->write($sheet, $row, $col, "");

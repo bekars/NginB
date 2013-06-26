@@ -3,7 +3,6 @@
 package BMD::IPOS;
 
 use strict;
-use utf8;
 use autodie;
 use Try::Tiny;
 use Data::Dumper;
@@ -190,6 +189,18 @@ sub format_region($)
         $pos_str = "$ipos->{country}";
     }
 
+    return $pos_str;
+}
+
+sub format_known_isp($)
+{
+    my $self = shift;
+    my $ipos = shift;
+    my $pos_str = undef;
+
+    if (($ipos->{isp} eq "电信") || ($ipos->{isp} eq "联通")) {
+        $pos_str = "$ipos->{region}_$ipos->{isp}";
+    }
     return $pos_str;
 }
 
