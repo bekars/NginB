@@ -19,6 +19,7 @@ use IO::Handle;
 
 use Speedy::ClientPos;
 use Speedy::CacheHit;
+use Speedy::LogInfo;
 
 my %options = ();
 my $startime = new Benchmark;
@@ -31,6 +32,7 @@ my $debuglog = 0;
 my %mod_h = ();
 
 
+my $loginfo_hld = undef;
 my $clipos_hld = undef;
 my $cachehit_hld = undef;
 
@@ -38,6 +40,9 @@ sub mod_init
 {
     $mod_h{date} = $log_time;
     $mod_h{dir} = "SPD_$log_time";
+
+    $loginfo_hld = Speedy::LogInfo->new();
+    $loginfo_hld->init();
 
     $clipos_hld = Speedy::ClientPos->new();
     $clipos_hld->set_debug_on();
@@ -232,8 +237,9 @@ sub analysis
         print(Dumper(\%node_h));
     }
 
+    $loginfo_hld->analysis(\%node_h);
     $clipos_hld->analysis(\%node_h);
-    $cachehit_hld->analysis(\%node_h);
+#$cachehit_hld->analysis(\%node_h);
 
 =pod
     nocache_analysis_mod(\%node_h);
@@ -438,12 +444,18 @@ if (exists($options{f})) {
     walk_dir($home_dir, "log.$log_time", \&parse_log);
 }
 
+$loginfo_hld->fini();
+$loginfo_hld->tostore();
+$loginfo_hld->destroy();
+
 $clipos_hld->fini();
+$clipos_hld->tostore();
+$clipos_hld->tofile();
 $clipos_hld->destroy();
 
-$cachehit_hld->fini();
+#$cachehit_hld->fini();
 #$cachehit_hld->send_mail();
-$cachehit_hld->destroy();
+#$cachehit_hld->destroy();
 
 =pod
 my $result_file = sprintf("%s/analysis_%s.result", $mod_h{dir}, $mod_h{date});

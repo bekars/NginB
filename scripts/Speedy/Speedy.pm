@@ -4,11 +4,11 @@ package Speedy::Speedy;
 require	Exporter;
 
 use strict;
-use Try::Tiny;
+use Storable;
 
 use vars qw($VERSION @EXPORT @ISA);
 @ISA 		= qw(Exporter);
-@EXPORT		= qw(&_get_ipseg &_round);
+@EXPORT		= qw(&_get_ipseg &_round &_tostore &_restore);
 $VERSION	= '1.0.0';
 
 sub new()
@@ -29,6 +29,55 @@ sub new()
     return $self;
 }
 
+sub init()
+{
+    my $self = shift;
+    $self->log("Speedy init function!\n");
+}
+
+sub fini()
+{
+    my $self = shift;
+    $self->log("Speedy fini function!\n");
+}
+
+sub destory()
+{
+    my $self = shift;
+    $self->log("Speedy destroy function!\n");
+}
+
+sub tofile()
+{
+    my $self = shift;
+    $self->log("Speedy tofile function!\n");
+}
+
+sub tostore()
+{
+    my $self = shift;
+    $self->log("Speedy tostore function!\n");
+}
+
+sub restore()
+{
+    my $self = shift;
+    $self->log("Speedy restore function!\n");
+}
+
+sub send_mail()
+{
+    my $self = shift;
+    $self->log("Speedy send_mail function!\n");
+}
+
+sub log($)
+{
+    my $self = shift;
+    my $str = shift;
+    printf("$self->{mod}: $str\n") if ($self->{debug});
+}
+
 sub set_basedir($)
 {
     my $self = shift;
@@ -47,6 +96,9 @@ sub set_debug_on()
     $self->{debug} = 1;
 }
 
+#
+# utils
+#
 sub _get_ipseg($)
 {
     my $ip = shift;
@@ -61,27 +113,18 @@ sub _round
     return sprintf("%.${num}f", $float);
 }
 
-sub init()
+sub _tostore($$)
 {
-    my $self = shift;
+    my ($data_ref, $file) = @_;
+    Storable::store($data_ref, $file);
 }
 
-sub fini()
+sub _restore($)
 {
-    my $self = shift;
-}
-
-sub destory()
-{
-    my $self = shift;
-}
-
-sub log($)
-{
-    my $self = shift;
-    my $str = shift;
-
-    printf("$self->{mod}: $str\n");
+    my ($file) = @_;
+    return unless (-e $file);
+    my $data_ref = Storable::retrieve("$file");
+    return $data_ref;
 }
 
 1;

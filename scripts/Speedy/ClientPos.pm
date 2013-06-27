@@ -66,12 +66,17 @@ my $_cluster_h = {};
 #       "rate"                  - 总访问比例
 my $_region_h = {};
 
+my $_ip_pos_h = {};
+
 my $_ipos = undef;
 my $_aqb = undef;
 
 sub new()
 {
-    my $self = Speedy::Speedy->new(mod=>'ClientPos', filename=>'client_pos.xls');
+    my $self = Speedy::Speedy->new(
+        mod      => 'ClientPos', 
+        filename => 'client_pos.xls'
+    );
     bless($self);
     return $self;
 }
@@ -162,11 +167,14 @@ sub init()
 sub fini()
 {
     my $self = shift;
-    my $file_xls = "$self->{basedir}/$self->{filename}";
-
-    # analysis ip and region
+    # convert ip to region
     _analysis_ip_region($_site_h, $self);
+}
 
+sub tofile()
+{
+    my $self = shift;
+    my $file_xls = "$self->{basedir}/$self->{filename}";
     my $excel_hld = BMD::EXCEL->new(filename=>"$file_xls");
     $self->{excel_hld} = $excel_hld;
 
@@ -189,14 +197,14 @@ sub send_mail()
     $mail->destroy();
 }
 
+#
 # ip => region
-my $_ip_pos_h = {};
-
+#
 sub _analysis_ip_region($$)
 {
     my ($data_h, $self) = @_;
     my $allip_h = {};
-   
+ 
     # find all kind ipseg
     foreach my $k1 (keys %$data_h) {
         my $ipseg_h = $data_h->{$k1}{ipseg};
@@ -204,7 +212,7 @@ sub _analysis_ip_region($$)
             $allip_h->{$kipseg} += $ipseg_h->{$kipseg}{cnt};
         }
     }
-    
+ 
     my $ip_cnt = keys %$allip_h;
     my $n = 0;
     LOOP: foreach my $k1 (sort keys %$allip_h) {
@@ -555,6 +563,41 @@ sub _log_download_pos($$$$)
     }
 
     close($fp);
+}
+
+sub tostore()
+{
+    my $self = shift;
+    my $data_ref = undef;
+    $data_ref->{_site_h}    = $_site_h;
+    $data_ref->{_cluster_h} = $_cluster_h;
+    $data_ref->{_region_h}  = $_region_h;
+    $data_ref->{_ip_pos_h}  = $_ip_pos_h;
+
+    my $file = "$self->{basedir}/$self->{mod}.store";
+    return _tostore($data_ref, $file);
+}
+
+sub restore()
+{
+    my $self = shift;
+    my $file = "$self->{basedir}/$self->{mod}.store";
+
+    $_site_h    = undef;
+    $_cluster_h = undef;
+    $_region_h  = undef;
+    $_ip_pos_h  = undef;
+
+    my $data_ref = _restore($file);
+    return unless $data_ref;
+
+    $_site_h    = $data_ref->{_site_h};
+    $_cluster_h = $data_ref->{_cluster_h};
+    $_region_h  = $data_ref->{_region_h};
+    $_ip_pos_h  = $data_ref->{_ip_pos_h};
+
+    printf(Dumper($_site_h));
+    return 1;
 }
 
 sub destroy()
