@@ -1,4 +1,8 @@
 
+
+# 测速比源站快30%以上站下载速度
+select round(down_size_bytes/(down_time_s+tcp_time_s+res_time_s)/1024,2) as down_speed from speed_res_data_20130622 where status_code=200 and header like '%X-Powered-By-Anquanbao: HIT from%' and down_size_bytes>20000 and role_name in (select distinct(concat(site, '_aqb')) from site_cesu_daily where date(time)='2013-06-22' and rate>30);
+
 # dnspod测速站列表
 select site from speed_task where dnspod=1 and role_status=1 order by site;
 
