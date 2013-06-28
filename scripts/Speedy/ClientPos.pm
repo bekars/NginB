@@ -133,6 +133,9 @@ sub analysis($)
     if ($cluster_info) {
         $cluster_str = "$node_h->{cluster_room}($cluster_info->{location})";
     } else {
+        # 没有cluster位置信息打印
+        printf(Dumper($node_h));
+
         if ($node_h->{cluster_room}) {
             $cluster_str = "$node_h->{cluster_room}";
         } else {
@@ -171,6 +174,30 @@ sub fini()
     _analysis_ip_region($_site_h, $self);
 }
 
+my $_rtt_h = undef;
+
+sub _load_rtt()
+{
+    open(my $fp, "</opt/rtt.db");
+    while (<$fp>) {
+        $_ =~ tr/\n//d;
+        $_ =~ tr/\r//d;
+        printf("$_\n");
+        my @arr = split(/\|/, $_);
+        next unless ($#arr == 3);
+        $_rtt_h->{$arr[0]}{$arr[1]}{rtt} = $arr[2];
+        $_rtt_h->{$arr[0]}{$arr[1]}{rate} = $arr[3];
+    }
+        
+    printf(Dumper($_rtt_h));
+    close($fp);
+}
+
+use constant {
+    RTT   => 1,
+    NORTT => 0,
+};
+
 sub tofile()
 {
     my $self = shift;
@@ -178,12 +205,15 @@ sub tofile()
     my $excel_hld = BMD::EXCEL->new(filename=>"$file_xls");
     $self->{excel_hld} = $excel_hld;
 
+    # load rtt data
+    _load_rtt();
+
     # analysis client position
-    _analysis_clipos("节点", $_cluster_h, $self);
-    _analysis_clipos("源站", $_site_h, $self);
+    _analysis_clipos($self, "节点", $_cluster_h, RTT);
+    _analysis_clipos($self, "源站", $_site_h, NORTT);
 
     # analysis region => cluster
-    _analysis_region("区域访问节点", $_cluster_h, $self);
+    _analysis_region($self, "区域访问节点", $_cluster_h);
     
     $self->{excel_hld}->destroy();
 }
@@ -233,7 +263,7 @@ sub _analysis_ip_region($$)
 
 sub _analysis_region($$$)
 {
-    my ($name, $cluster_h, $self) = @_;
+    my ($self, $name, $cluster_h) = @_;
     my $total = 0;
 
     # 计算每个区域访问各个cluster的次数
@@ -275,16 +305,15 @@ sub _analysis_region($$$)
         $_region_h->{$kreg}{total}{rate} = _round(($_region_h->{$kreg}{total}{cnt} * 100) / $total, 2)
     }
 
-    _log_region($name, $cluster_h, $_region_h, $self);
-
-    _log_region_excel($name, $cluster_h, $_region_h, $self);
+    # generate excel
+    _log_region_excel($self, $name, $cluster_h, $_region_h);
 
     return 1;
 }
 
 sub _log_region_excel($$$$)
 {
-    my ($name, $cluster_h, $region_h, $self) = @_;
+    my ($self, $name, $cluster_h, $region_h) = @_;
     my ($row, $col) = (0, 0);
 
     my $excel_hld = $self->{excel_hld};
@@ -323,14 +352,14 @@ sub _log_region_excel($$$$)
     }
 }
 
-sub _analysis_clipos($$$)
+sub _analysis_clipos($$$$)
 {
-    my ($name, $data_h, $self) = @_;
+    my ($self, $name, $data_h, $is_rtt) = @_;
     my $total = 0;
     my $allip_h = {};
     my $allpos_h = {};
 
-    # 计算每个网站在各个ip段的访问百分比
+    # 计算每个节点/网站在各个ip段的访问百分比
     foreach my $k1 (keys %$data_h) {
         $total = 0;
         my $ipseg_h = $data_h->{$k1}{ipseg};
@@ -388,21 +417,38 @@ sub _analysis_clipos($$$)
         $data_h->{$k1}{total}{rate} = _round($total * 100 / $total_cnt, 2);
     }
 
-    # write to log file
-    _log_cnt_pos($name, $allpos_h, $data_h, $total_cnt, $self);
-    _log_download_pos($name, $allpos_h, $data_h, $self);
+    # generate excel
+    _log_cnt_download_excel($self, $name, $allpos_h, $data_h, $total_cnt, $is_rtt);
 
-    _log_cnt_download_excel($name, $allpos_h, $data_h, $total_cnt, $self);
     return 1;
 }
 
-sub _log_cnt_download_excel($$$$)
+my $_color = {
+    black     =>    8,
+    blue      =>   12,
+    brown     =>   16,
+    cyan      =>   15,
+    gray      =>   23,
+    green     =>   17,
+    lime      =>   11,
+    magenta   =>   14,
+    navy      =>   18,
+    orange    =>   53,
+    pink      =>   33,
+    purple    =>   20,
+    red       =>   10,
+    silver    =>   22,
+    white     =>    9,
+    yellow    =>   13,
+};
+
+sub _log_cnt_download_excel($$$$$$)
 {
-    my ($name, $allpos_h, $data_h, $total_cnt, $self) = @_;
+    my ($self, $name, $allpos_h, $data_h, $total_cnt, $is_rtt) = @_;
     my ($row, $col, $total) = (0, 0, 0);
 
     my $excel_hld = $self->{excel_hld};
-    my $sheet = $excel_hld->add_sheet("$name(下载速度|访问比例)");
+    my $sheet = $excel_hld->add_sheet("$name(下载速度|延时|访问比例)");
     $excel_hld->set_column_width($sheet, 0, 0, 20);
     $excel_hld->set_column_width($sheet, 2, 1000, 12);
 
@@ -424,15 +470,17 @@ sub _log_cnt_download_excel($$$$)
         $excel_hld->write($sheet, $row, $col, "$allpos_h->{$k}%", "black", "yellow");
     }
 
-    foreach my $k1 (sort {$data_h->{$b}{total}{rate}<=>$data_h->{$a}{total}{rate}} keys %$data_h) {
+    foreach my $k1 (sort {$data_h->{$b}{total}{rate}<=>$data_h->{$a}{total}{rate}} keys %$data_h) 
+    {
         $col = 0;
         ++$row;
         $excel_hld->write($sheet, $row, $col, "$k1");
         ++$col;
         $excel_hld->write($sheet, $row, $col, "$data_h->{$k1}{total}{rate}%", "black", "cyan", "right");
-        foreach my $k2 (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
+        foreach my $k2 (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) 
+        {
             ++$col;
-            my ($rate, $drate);
+            my ($rate, $downspeed);
             if (exists($data_h->{$k1}{pos}{$k2}{rate})) {
                 $rate = _round($data_h->{$k1}{pos}{$k2}{rate}, 2);
             } else {
@@ -440,31 +488,125 @@ sub _log_cnt_download_excel($$$$)
             }
                 
             if (exists($data_h->{$k1}{pos}{$k2}{download_rate})) {
-                $drate = _round($data_h->{$k1}{pos}{$k2}{download_rate} / $data_h->{$k1}{pos}{$k2}{download_cnt} / 1024, 2);
+                $downspeed = _round($data_h->{$k1}{pos}{$k2}{download_rate} / $data_h->{$k1}{pos}{$k2}{download_cnt} / 1024, 2);
             } else {
-                $drate = 0;
+                $downspeed = 0;
             }
 
-            #
-            # over 5% visit and download rate < 100 is bad
-            #
-            if (($rate >= 5) && ($drate > 0 && $drate < 100)) {
-                $excel_hld->write($sheet, $row, $col, "${drate}|${rate}%", "black", "red");
+            my ($text, $color) = _color_data($k1, $k2, $downspeed, $rate, $is_rtt);
+            if ($color) {
+                $excel_hld->write($sheet, $row, $col, $text, "black", $color);
             } else {
-                if (($rate >= 5) && $drate >= 100) {
-                    $excel_hld->write($sheet, $row, $col, "${drate}|${rate}%", "black", "lime");
-                } else {
-                    if (!$rate && !$drate) {
-                        $excel_hld->write($sheet, $row, $col, "");
-                    } else {
-                        $excel_hld->write($sheet, $row, $col, "${drate}|${rate}%");
-                    }
-                }
+                $excel_hld->write($sheet, $row, $col, $text);
             }
         }
     }
+    
+    _show_help($self, $sheet, $row, $col);
 }
 
+sub _show_help($$$$)
+{
+    my ($self, $sheet, $row, $col) = @_;
+    my $excel_hld = $self->{excel_hld};
+
+    $row += 5;
+    $col = 0;
+    foreach my $kcolor (sort keys %$_color) {
+        $excel_hld->write($sheet, $row, $col, "", "black", $kcolor);
+        ++$col;
+    }
+    $row += 2;
+    $col = 0;
+    $excel_hld->write($sheet, $row, $col, "访问量>5%, GOOD", "black", "lime");
+    ++$row;
+    $excel_hld->write($sheet, $row, $col, "访问量>5%, 下载<700KB/s", "black", "red");
+    ++$row;
+    $excel_hld->write($sheet, $row, $col, "访问量>5%, RTT<40ms", "black", "pink");
+}
+
+sub _color_data($$$$$)
+{
+    my ($cluster, $region, $downspeed, $rate, $is_rtt) = @_;
+    my ($text, $color) = ("", undef);
+    my ($rtt_time, $rtt_rate) = (0, 0);
+
+    if ($is_rtt && exists($_rtt_h->{$cluster}{$region})) {
+        $rtt_time = $_rtt_h->{$cluster}{$region}{rtt};
+        $rtt_rate = $_rtt_h->{$cluster}{$region}{rate};
+        $text = "${downspeed}|${rtt_time}|${rtt_rate}%|${rate}%";
+    } else {
+        if (!$rate && !$downspeed) {
+            $text = "";
+        } else {
+            $text = "${downspeed}|${rate}%";
+        }
+    }
+
+    #
+    # over 5% to color, bad is:
+    # 1. download rate < 700 or
+    # 2. rtt < 40ms over 80% or
+    # 3. rtt > 40ms
+    #
+    if ($rate >= 5) {
+        if ($downspeed > 0 && $downspeed < 700) {
+            $color = "red";
+        } elsif (($rtt_rate >= 80) || ($rtt_time > 40)) {
+            $color = "pink";
+        } else {
+            $color = "lime";
+        }
+    }
+
+    return ($text, $color);
+}
+
+sub tostore()
+{
+    my $self = shift;
+    my $data_ref = undef;
+    $data_ref->{_site_h}    = $_site_h;
+    $data_ref->{_cluster_h} = $_cluster_h;
+    $data_ref->{_region_h}  = $_region_h;
+    $data_ref->{_ip_pos_h}  = $_ip_pos_h;
+
+    my $file = "$self->{basedir}/$self->{mod}.store";
+    return _tostore($data_ref, $file);
+}
+
+sub restore()
+{
+    my $self = shift;
+    my $file = "$self->{basedir}/$self->{mod}.store";
+
+    $_site_h    = undef;
+    $_cluster_h = undef;
+    $_region_h  = undef;
+    $_ip_pos_h  = undef;
+
+    my $data_ref = _restore($file);
+    return unless $data_ref;
+
+    $_site_h    = $data_ref->{_site_h};
+    $_cluster_h = $data_ref->{_cluster_h};
+    $_region_h  = $data_ref->{_region_h};
+    $_ip_pos_h  = $data_ref->{_ip_pos_h};
+
+    return 1;
+}
+
+sub destroy()
+{
+    my $self = shift;
+    $self->{ipos}->destroy();
+}
+
+1;
+
+# vim: ts=4:sw=4:et
+
+=pod
 sub _log_region($$$)
 {
     my ($name, $cluster_h, $region_h, $self) = @_;
@@ -564,49 +706,5 @@ sub _log_download_pos($$$$)
 
     close($fp);
 }
-
-sub tostore()
-{
-    my $self = shift;
-    my $data_ref = undef;
-    $data_ref->{_site_h}    = $_site_h;
-    $data_ref->{_cluster_h} = $_cluster_h;
-    $data_ref->{_region_h}  = $_region_h;
-    $data_ref->{_ip_pos_h}  = $_ip_pos_h;
-
-    my $file = "$self->{basedir}/$self->{mod}.store";
-    return _tostore($data_ref, $file);
-}
-
-sub restore()
-{
-    my $self = shift;
-    my $file = "$self->{basedir}/$self->{mod}.store";
-
-    $_site_h    = undef;
-    $_cluster_h = undef;
-    $_region_h  = undef;
-    $_ip_pos_h  = undef;
-
-    my $data_ref = _restore($file);
-    return unless $data_ref;
-
-    $_site_h    = $data_ref->{_site_h};
-    $_cluster_h = $data_ref->{_cluster_h};
-    $_region_h  = $data_ref->{_region_h};
-    $_ip_pos_h  = $data_ref->{_ip_pos_h};
-
-    printf(Dumper($_site_h));
-    return 1;
-}
-
-sub destroy()
-{
-    my $self = shift;
-    $self->{ipos}->destroy();
-}
-
-1;
-
-# vim: ts=4:sw=4:et
+=cut
 

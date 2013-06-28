@@ -36,7 +36,7 @@ sub add_sheet($)
     return $self->{excel}->add_worksheet($name);
 }
 
-sub write
+sub write($$$$;$$$)
 {
     my ($self, $sheet, $row, $col, $text, $color, $bgcolor, $align) = @_;
     my $format;
@@ -50,6 +50,22 @@ sub write
         $sheet->write($row, $col, $text, $format);
     } else {
         $sheet->write($row, $col, $text);
+    }
+}
+
+sub write_number($$$$;$$$)
+{
+    my ($self, $sheet, $row, $col, $text, $color, $bgcolor, $align) = @_;
+    my $format;
+
+    if ($color) {
+        $format = $self->{excel}->add_format();
+        $format->set_color($color);
+        $format->set_bg_color($bgcolor) if ($bgcolor);
+        $format->set_align($align) if ($align);
+        $sheet->write_number($row, $col, $text, $format);
+    } else {
+        $sheet->write_number($row, $col, $text);
     }
 }
 
