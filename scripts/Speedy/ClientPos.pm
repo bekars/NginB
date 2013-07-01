@@ -75,7 +75,8 @@ sub new()
 {
     my $self = Speedy::Speedy->new(
         mod      => 'ClientPos', 
-        filename => 'client_pos.xls'
+        filename => 'client_pos.xls',
+        basedir  => '/home/apuadmin/baiyu',
     );
     bless($self);
     return $self;
@@ -114,7 +115,9 @@ sub analysis($)
 {
     my $self = shift;
     my $node_h = shift;
-    return if (!defined($node_h));
+    return unless defined($node_h);
+    return if (($node_h->{cluster} eq "cscs") or ($node_h->{cluster_room} eq "cscs"));
+
     my ($cluster_info, $cluster_str);
     my ($site_info, $site_region, $site_str);
 
@@ -134,7 +137,8 @@ sub analysis($)
         $cluster_str = "$node_h->{cluster_room}($cluster_info->{location})";
     } else {
         # 没有cluster位置信息打印
-        printf(Dumper($node_h));
+        printf("### NO CLUSTER $node_h->{cluster} INFO!\n");
+        #printf(Dumper($node_h));
 
         if ($node_h->{cluster_room}) {
             $cluster_str = "$node_h->{cluster_room}";
@@ -174,24 +178,31 @@ sub fini()
     _analysis_ip_region($_site_h, $self);
 }
 
+# rtt.db
+# cluster_room|region|rtt|rtt_rate
+#
+# cluster_room
+#   region
+#       {rtt}
+#       {rate}
+#
 my $_rtt_h = undef;
-
 sub _load_rtt()
 {
-    open(my $fp, "</opt/rtt.db");
+    open(my $fp, "</home/apuadmin/baiyu/rtt.db");
     while (<$fp>) {
         $_ =~ tr/\n//d;
         $_ =~ tr/\r//d;
-        printf("$_\n");
         my @arr = split(/\|/, $_);
         next unless ($#arr == 3);
         $_rtt_h->{$arr[0]}{$arr[1]}{rtt} = $arr[2];
-        $_rtt_h->{$arr[0]}{$arr[1]}{rate} = $arr[3];
+        $_rtt_h->{$arr[0]}{$arr[1]}{rtt_rate} = $arr[3];
     }
         
-    printf(Dumper($_rtt_h));
+    #printf(Dumper($_rtt_h));
     close($fp);
 }
+ 
 
 use constant {
     RTT   => 1,
@@ -209,11 +220,15 @@ sub tofile()
     _load_rtt();
 
     # analysis client position
-    _analysis_clipos($self, "节点", $_cluster_h, RTT);
-    _analysis_clipos($self, "源站", $_site_h, NORTT);
+    my $allpos_h = _analysis_clipos($self, "节点", $_cluster_h, RTT);
 
+    # select cluster to service region
+    _analysis_cluster($self, "优先调度节点", $_cluster_h, $allpos_h);
+    
     # analysis region => cluster
     _analysis_region($self, "区域访问节点", $_cluster_h);
+
+    _analysis_clipos($self, "源站", $_site_h, NORTT);
     
     $self->{excel_hld}->destroy();
 }
@@ -259,6 +274,120 @@ sub _analysis_ip_region($$)
     }
 
     return 1;
+}
+
+use constant { MAX_PERCENT => 100 };
+sub _analysis_cluster($$$$)
+{
+    my ($self, $name, $cluster_h, $allpos_h) = @_;
+    my $selector_h = {};
+    my $region_h = {};
+
+    my $total = 0;
+    # 找出所有region
+    foreach my $k (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
+        $total += $allpos_h->{$k};
+        last if $total > MAX_PERCENT; 
+        $region_h->{$k} = $allpos_h->{$k};
+    }
+
+    # 找出所有区域访问最快的节点
+    foreach my $kreg (sort {$region_h->{$b}<=>$region_h->{$a}} keys %$region_h) {
+        my $max_speed = 0;
+        my $min_rtt = 9999;
+        my $select_clu = undef;
+
+        # 有rtt按rtt算，没有rtt用downspeed算
+        foreach my $kclu (keys %$cluster_h) {
+            if (exists($cluster_h->{$kclu}{pos}{$kreg})) {
+                if ((9999 == $min_rtt) && 
+                    exists($cluster_h->{$kclu}{pos}{$kreg}{download_rate}) && 
+                    ($cluster_h->{$kclu}{pos}{$kreg}{download_rate} > $max_speed)) 
+                {
+                    $max_speed = $cluster_h->{$kclu}{pos}{$kreg}{download_rate};
+                    $select_clu = $kclu;
+                }
+
+                if (exists($_rtt_h->{$kclu}{$kreg}{rtt}) && 
+                    ($_rtt_h->{$kclu}{$kreg}{rtt} > 0) &&
+                    ($_rtt_h->{$kclu}{$kreg}{rtt} < $min_rtt))
+                {
+                    $min_rtt = $_rtt_h->{$kclu}{$kreg}{rtt};
+                    $select_clu = $kclu;
+                }
+            }
+        }
+
+        if ($select_clu) {
+            my ($downspeed, $rtt, $rtt_rate) = (0, 0, 0);
+            if (exists($cluster_h->{$select_clu}{pos}{$kreg}{download_rate})) {
+                $downspeed = $cluster_h->{$select_clu}{pos}{$kreg}{download_rate};
+            }
+            if (exists($_rtt_h->{$select_clu}{$kreg}{rtt})) {
+                $rtt = $_rtt_h->{$select_clu}{$kreg}{rtt};
+                $rtt_rate = $_rtt_h->{$select_clu}{$kreg}{rtt_rate};
+            }
+            $selector_h->{$select_clu}{$kreg}{downspeed} = $downspeed;
+            $selector_h->{$select_clu}{$kreg}{rtt} = $rtt;
+            $selector_h->{$select_clu}{$kreg}{rtt_rate} = $rtt_rate;
+        }
+    }
+
+    #printf(Dumper($selector_h));
+    _log_selector_excel($self, $name, $selector_h, $region_h, $cluster_h);
+
+}
+
+sub _log_selector_excel($$$$$)
+{
+    my ($self, $name, $selector_h, $region_h, $cluster_h) = @_;
+    my ($row, $col, $total) = (0, 0, 0);
+
+    my $excel_hld = $self->{excel_hld};
+    my $sheet = $excel_hld->add_sheet("$name");
+    $excel_hld->set_column_width($sheet, 0, 0, 20);
+    $excel_hld->set_column_width($sheet, 1, 1000, 15);
+
+    $excel_hld->write($sheet, $row, $col, "客户端区域", "black", "yellow");
+    foreach my $k (sort {$region_h->{$b}<=>$region_h->{$a}} keys %$region_h) {
+        ++$col;
+        $excel_hld->write($sheet, $row, $col, "$k", "black", "yellow");
+    }
+    
+    $col = 0;
+    ++$row;
+    $excel_hld->write($sheet, $row, $col, "区域访问百分比", "black", "yellow");
+    foreach my $k (sort {$region_h->{$b}<=>$region_h->{$a}} keys %$region_h) {
+        ++$col;
+        $excel_hld->write($sheet, $row, $col, "$region_h->{$k}%", "black", "yellow");
+    }
+
+    foreach my $kclu (sort {$cluster_h->{$b}{total}{rate}<=>$cluster_h->{$a}{total}{rate}} keys %$cluster_h) 
+    {
+        # 没有选中的节点不显示
+        next unless exists($selector_h->{$kclu});
+
+        $col = 0;
+        ++$row;
+        $excel_hld->write($sheet, $row, $col, "$kclu");
+        foreach my $kreg (sort {$region_h->{$b}<=>$region_h->{$a}} keys %$region_h) 
+        {
+            ++$col;
+            if (exists($selector_h->{$kclu}{$kreg})) {
+                my $downspeed = $selector_h->{$kclu}{$kreg}{downspeed};
+                my $rtt = $selector_h->{$kclu}{$kreg}{rtt};
+                my $rtt_rate = $selector_h->{$kclu}{$kreg}{rtt_rate};
+                my ($text, $color) = _color_data($kclu, $kreg, $downspeed, 100, RTT);
+                if ($color) {
+                    $excel_hld->write($sheet, $row, $col, "$downspeed|$rtt|$rtt_rate", "black", $color);
+                } else {
+                    $excel_hld->write($sheet, $row, $col, "$downspeed|$rtt|$rtt_rate");
+                }
+            }
+        }
+    }
+    
+    _show_help($self, $sheet, $row, $col);
 }
 
 sub _analysis_region($$$)
@@ -420,7 +549,7 @@ sub _analysis_clipos($$$$)
     # generate excel
     _log_cnt_download_excel($self, $name, $allpos_h, $data_h, $total_cnt, $is_rtt);
 
-    return 1;
+    return $allpos_h;
 }
 
 my $_color = {
@@ -448,7 +577,7 @@ sub _log_cnt_download_excel($$$$$$)
     my ($row, $col, $total) = (0, 0, 0);
 
     my $excel_hld = $self->{excel_hld};
-    my $sheet = $excel_hld->add_sheet("$name(下载速度|延时|访问比例)");
+    my $sheet = $excel_hld->add_sheet("$name(下载速度|延时|延时比例|访问比例)");
     $excel_hld->set_column_width($sheet, 0, 0, 20);
     $excel_hld->set_column_width($sheet, 2, 1000, 12);
 
@@ -488,7 +617,8 @@ sub _log_cnt_download_excel($$$$$$)
             }
                 
             if (exists($data_h->{$k1}{pos}{$k2}{download_rate})) {
-                $downspeed = _round($data_h->{$k1}{pos}{$k2}{download_rate} / $data_h->{$k1}{pos}{$k2}{download_cnt} / 1024, 2);
+                $data_h->{$k1}{pos}{$k2}{download_rate} = _round($data_h->{$k1}{pos}{$k2}{download_rate} / $data_h->{$k1}{pos}{$k2}{download_cnt} / 1024, 2);
+                $downspeed = $data_h->{$k1}{pos}{$k2}{download_rate};
             } else {
                 $downspeed = 0;
             }
@@ -522,7 +652,7 @@ sub _show_help($$$$)
     ++$row;
     $excel_hld->write($sheet, $row, $col, "访问量>5%, 下载<700KB/s", "black", "red");
     ++$row;
-    $excel_hld->write($sheet, $row, $col, "访问量>5%, RTT<40ms", "black", "pink");
+    $excel_hld->write($sheet, $row, $col, "访问量>5%, RTT>40ms或者RTT<40ms百分比小于80%", "black", "pink");
 }
 
 sub _color_data($$$$$)
@@ -531,9 +661,9 @@ sub _color_data($$$$$)
     my ($text, $color) = ("", undef);
     my ($rtt_time, $rtt_rate) = (0, 0);
 
-    if ($is_rtt && exists($_rtt_h->{$cluster}{$region})) {
+    if ($is_rtt && exists($_rtt_h->{$cluster}{$region}{rtt})) {
         $rtt_time = $_rtt_h->{$cluster}{$region}{rtt};
-        $rtt_rate = $_rtt_h->{$cluster}{$region}{rate};
+        $rtt_rate = $_rtt_h->{$cluster}{$region}{rtt_rate};
         $text = "${downspeed}|${rtt_time}|${rtt_rate}%|${rate}%";
     } else {
         if (!$rate && !$downspeed) {
@@ -546,13 +676,13 @@ sub _color_data($$$$$)
     #
     # over 5% to color, bad is:
     # 1. download rate < 700 or
-    # 2. rtt < 40ms over 80% or
+    # 2. rtt < 40ms and below 80% or
     # 3. rtt > 40ms
     #
     if ($rate >= 5) {
         if ($downspeed > 0 && $downspeed < 700) {
             $color = "red";
-        } elsif (($rtt_rate >= 80) || ($rtt_time > 40)) {
+        } elsif (($rtt_rate < 80 && $rtt_time < 40) || ($rtt_time > 40)) {
             $color = "pink";
         } else {
             $color = "lime";
@@ -586,7 +716,7 @@ sub restore()
     $_ip_pos_h  = undef;
 
     my $data_ref = _restore($file);
-    return unless $data_ref;
+    die "ERR: restore $self->{basedir}/$self->{mod}.store fail!" unless $data_ref;
 
     $_site_h    = $data_ref->{_site_h};
     $_cluster_h = $data_ref->{_cluster_h};
@@ -695,7 +825,8 @@ sub _log_download_pos($$$$)
         printf($fp "$k1\t");
         foreach my $k2 (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
             if (exists($data_h->{$k1}{pos}{$k2}{download_rate})) {
-                my $rate = _round($data_h->{$k1}{pos}{$k2}{download_rate} / $data_h->{$k1}{pos}{$k2}{download_cnt} / 1024, 2);
+                $data_h->{$k1}{pos}{$k2}{download_rate} = _round($data_h->{$k1}{pos}{$k2}{download_rate} / $data_h->{$k1}{pos}{$k2}{download_cnt} / 1024, 2);
+                my $rate = $data_h->{$k1}{pos}{$k2}{download_rate};
                 printf($fp "$rate\t");
             } else {
                 printf($fp "0\t");

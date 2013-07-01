@@ -365,7 +365,6 @@ sub walk_log
     }
 
     foreach my $node (@$log_arr) {
-        printf("### $node\n");
         my $file = $dir . "/access_" . $node . "_80\." . $suffix;
 
         if (-e $file) {
