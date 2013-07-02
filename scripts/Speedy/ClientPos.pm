@@ -344,7 +344,7 @@ sub _log_selector_excel($$$$$)
     my ($row, $col, $total) = (0, 0, 0);
 
     my $excel_hld = $self->{excel_hld};
-    my $sheet = $excel_hld->add_sheet("$name");
+    my $sheet = $excel_hld->add_sheet("$name(下载速度|延时)");
     $excel_hld->set_column_width($sheet, 0, 0, 20);
     $excel_hld->set_column_width($sheet, 1, 1000, 15);
 
@@ -682,7 +682,7 @@ sub _color_data($$$$$)
     if ($rate >= 5) {
         if ($downspeed > 0 && $downspeed < 700) {
             $color = "red";
-        } elsif (($rtt_rate < 80 && $rtt_time < 40) || ($rtt_time > 40)) {
+        } elsif (($rtt_time > 0) && (($rtt_rate < 80 && $rtt_time < 40) || ($rtt_time > 40))) {
             $color = "pink";
         } else {
             $color = "lime";
@@ -735,107 +735,4 @@ sub destroy()
 1;
 
 # vim: ts=4:sw=4:et
-
-=pod
-sub _log_region($$$)
-{
-    my ($name, $cluster_h, $region_h, $self) = @_;
-
-    open(my $fp, ">$self->{basedir}/pos_${name}_cnt.txt");
-    printf($fp "客户端位置\\机房\t占总访问量百分比\t");
-    foreach my $kclu (sort keys %$cluster_h) {
-        printf($fp "${kclu}\t");
-    }
-    printf($fp "\n");
-
-    foreach my $kreg (sort {$region_h->{$b}{total}{rate} <=> $region_h->{$a}{total}{rate}} keys %$region_h) {
-
-        printf($fp "$kreg\t$region_h->{$kreg}{total}{rate}%%\t");
-        foreach my $kclu (sort keys %$cluster_h) {
-            if (exists($region_h->{$kreg}{cluster}{$kclu})) {
-                my $rate = _round($region_h->{$kreg}{cluster}{$kclu}{rate}, 2);
-                printf($fp "$rate\t");
-            } else {
-                printf($fp "0\t");
-            }
-        }
-        printf($fp "\n");
-    }
-
-    close($fp);
-}
-
-sub _log_cnt_pos($$$$)
-{
-    my ($name, $allpos_h, $data_h, $total_cnt, $self) = @_;
-    my $total = 0;
-
-    open(my $fp, ">$self->{basedir}/pos_${name}_cnt.txt");
-    printf($fp "客户端区域\t所有区域\t");
-    foreach my $k (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
-        printf($fp "${k}\t");
-    }
-    printf($fp "\n");
-
-    printf($fp "区域访问百分比\t$total_cnt\t");
-    foreach my $k (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
-        printf($fp "$allpos_h->{$k}%%\t");
-    }
-    printf($fp "\n");
-
-    foreach my $k1 (keys %$data_h) {
-        $total = 0;
-        foreach my $k2 (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
-            $total += $data_h->{$k1}{pos}{$k2}{cnt} if (exists($data_h->{$k1}{pos}{$k2}{cnt}));
-        }
-
-        printf($fp "$k1\t$total\t");
-        foreach my $k2 (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
-            if (exists($data_h->{$k1}{pos}{$k2}{rate})) {
-                my $rate = _round($data_h->{$k1}{pos}{$k2}{rate}, 2);
-                printf($fp "$rate\t");
-            } else {
-                printf($fp "0\t");
-            }
-        }
-        printf($fp "\n");
-    }
-
-    close($fp);
-}
-
-sub _log_download_pos($$$$)
-{
-    my ($name, $allpos_h, $data_h, $self) = @_;
-
-    open(my $fp, ">$self->{basedir}/pos_${name}_download.txt");
-    printf($fp "客户端区域\t");
-    foreach my $k (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
-        printf($fp "${k}\t");
-    }
-    printf($fp "\n");
-
-    printf($fp "区域访问百分比\t");
-    foreach my $k (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
-        printf($fp "$allpos_h->{$k}%%\t");
-    }
-    printf($fp "\n");
-
-    foreach my $k1 (keys %$data_h) {
-        printf($fp "$k1\t");
-        foreach my $k2 (sort {$allpos_h->{$b}<=>$allpos_h->{$a}} keys %$allpos_h) {
-            if (exists($data_h->{$k1}{pos}{$k2}{download_rate})) {
-                $data_h->{$k1}{pos}{$k2}{download_rate} = _round($data_h->{$k1}{pos}{$k2}{download_rate} / $data_h->{$k1}{pos}{$k2}{download_cnt} / 1024, 2);
-                my $rate = $data_h->{$k1}{pos}{$k2}{download_rate};
-                printf($fp "$rate\t");
-            } else {
-                printf($fp "0\t");
-            }
-        }
-        printf($fp "\n");
-    }
-
-    close($fp);
-}
-=cut
 

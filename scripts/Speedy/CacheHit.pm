@@ -39,6 +39,7 @@ use BMD::MAIL;
 #           {cachehit_flow}
 #           {cacherate}
 #           {cacherate_flow}
+#           remote_ip
 # {total}
 #       {cnt}
 #       {flow}
@@ -54,6 +55,7 @@ use BMD::MAIL;
 #       {cachehit_flow}
 #       {cacherate}
 #       {cacherate_flow}
+#       remote_ip
 #
 my $_cachehit = undef;
 
@@ -66,7 +68,6 @@ sub new()
 }
 
 my $_remote_ip = undef;
-my $_log_cnt = 0;
 sub analysis($)
 {
     my $self = shift;
@@ -88,14 +89,14 @@ sub analysis($)
     $_cachehit->{total}{flow} += $node_h->{body_len};
     $_cachehit->{total}{"$node_h->{cache_status}"} += 1;
     $_cachehit->{total}{"$node_h->{cache_status}_flow"} += $node_h->{body_len};
+    $_cachehit->{total}{remote_ip}{$node_h->{remote_ip}} += 1;
 
     $_cachehit->{site}{"$node_h->{domain}"}{cnt} += 1;
     $_cachehit->{site}{"$node_h->{domain}"}{flow} += $node_h->{body_len};
     $_cachehit->{site}{"$node_h->{domain}"}{"$node_h->{cache_status}"} += 1;
     $_cachehit->{site}{"$node_h->{domain}"}{"$node_h->{cache_status}_flow"} += $node_h->{body_len};
 
-    $_remote_ip->{$node_h->{remote_ip}} += 1;
-    ++$_log_cnt;
+    $_cachehit->{site}{"$node_h->{domain}"}{remote_ip}{$node_h->{remote_ip}} += 1;
     return 1;
 }
 
@@ -132,21 +133,21 @@ sub _cal_hitrate($)
     $total_flow = ($hit_flow + $miss_flow + $expired_flow);
 
     if (0 == $total) {
-        $data->{cachehit} = -1;
+        $data->{cachehit} = 0;
     } else {
         $data->{cachehit} = _round($hit * 100 / $total);
     }
 
     if (0 == $total_flow) {
-        $data->{cachehit_flow} = -1;
+        $data->{cachehit_flow} = 0;
     } else {
         $data->{cachehit_flow} = _round($hit_flow * 100 / $total_flow);
     }
 
     if ((0 == $data->{cnt}) || (0 == $data->{flow})) 
     {
-        $data->{cacherate} = -1;
-        $data->{cacherate_flow} = -1;
+        $data->{cacherate} = 0;
+        $data->{cacherate_flow} = 0;
     } else {
         $data->{cacherate} = _round($hit * 100 / $data->{cnt});
         $data->{cacherate_flow} = _round($hit_flow * 100 / $data->{flow});
@@ -206,25 +207,23 @@ sub send_mail()
     my $date = `date -d"-1 day" +"%Y%m%d"`;
     $date =~ tr/\n//d;
     $date =~ tr/\r//d;
-    my $site = "test.weiweimeishi.com";
     my $mail = BMD::MAIL->new();
-    my $content = "[$site]\n总流量：\t%sMB\n节省流量：\t%sMB\n缓存率：\t%s%%\n" . 
+    my $tmplate = "[%s]\n总流量：\t%sMB\n节省流量：\t%sMB\n缓存率：\t%s%%\n" . 
                   "缓存命中率：\t%s%%\n独立访问客户端数：\t%d\n" .
-                  "总访问次数：\t%d\n";
-    
-    foreach my $k (keys %{$_cachehit->{site}}) {
-        if ($k eq $site) {
-            my $flow = _round($_cachehit->{site}{$k}{flow} / 1024 / 1024);
-            my $flow_save = _round($flow * $_cachehit->{site}{$k}{cacherate_flow} / 100);
-            my $total_remote = keys %$_remote_ip;
+                  "总访问次数：\t%d\n\n\n";
+    my $content = "";
 
-            $content = sprintf($content, 
+    foreach my $k (keys %{$_cachehit->{site}}) {
+        my $flow = _round($_cachehit->{site}{$k}{flow} / 1024 / 1024);
+        my $flow_save = _round($flow * $_cachehit->{site}{$k}{cacherate_flow} / 100);
+        my $total_remote = keys %{$_cachehit->{site}{$k}{remote_ip}};
+
+        $content .= sprintf($tmplate, $k,
                 $flow, $flow_save, $_cachehit->{site}{$k}{cacherate_flow}, 
-                $_cachehit->{site}{$k}{cachehit}, $total_remote, $_log_cnt);
-            last;
-        }
+                $_cachehit->{site}{$k}{cachehit}, $total_remote, 
+                $_cachehit->{site}{$k}{cnt});
     }
-    $mail->send_mail("[火花下载]每日统计_$date", $content, undef, $mail_to);
+    $mail->send_mail("[网站流量]每日统计_$date", $content, undef, $mail_to);
     $mail->destroy();
 }
 
