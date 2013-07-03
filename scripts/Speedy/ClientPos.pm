@@ -680,10 +680,10 @@ sub _color_data($$$$$)
     # 3. rtt > 40ms
     #
     if ($rate >= 5) {
-        if ($downspeed > 0 && $downspeed < 700) {
-            $color = "red";
-        } elsif (($rtt_time > 0) && (($rtt_rate < 80 && $rtt_time < 40) || ($rtt_time > 40))) {
+        if (($rtt_time > 0) && (($rtt_rate < 80 && $rtt_time < 40) || ($rtt_time > 40))) {
             $color = "pink";
+        } elsif ($downspeed > 0 && $downspeed < 700) {
+            $color = "red";
         } else {
             $color = "lime";
         }
