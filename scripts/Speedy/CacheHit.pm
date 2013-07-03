@@ -82,6 +82,10 @@ sub analysis($)
         ($node_h->{agent} =~ m/aqb_prefetch/i) ||
         ($node_h->{agent} =~ m/aqb-monitor/i))
     {
+        if (!exists($_cachehit->{site}{"$node_h->{domain}"})) {
+            $_cachehit->{site}{"$node_h->{domain}"}{cnt} = 0;
+            $_cachehit->{site}{"$node_h->{domain}"}{flow} = 0;
+        }
         return;
     }
 
@@ -111,6 +115,8 @@ sub _cal_hitrate($)
     my $hitrate = undef;
     my ($hit, $miss, $expired, $nocache, $hit_flow, $miss_flow, $expired_flow, $nocache_flow, $total, $total_flow) = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
+    $data->{cnt}           = 0 if (!exists($data->{cnt}));
+    $data->{flow}          = 0 if (!exists($data->{flow}));
     $data->{hit}           = 0 if (!exists($data->{hit}));
     $data->{miss}          = 0 if (!exists($data->{miss}));
     $data->{expired}       = 0 if (!exists($data->{expired}));

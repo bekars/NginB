@@ -207,6 +207,8 @@ sub _load_rtt()
 use constant {
     RTT   => 1,
     NORTT => 0,
+    SELECTOR => 1,
+    NO_SELECTOR => 0,
 };
 
 sub tofile()
@@ -220,7 +222,7 @@ sub tofile()
     _load_rtt();
 
     # analysis client position
-    my $allpos_h = _analysis_clipos($self, "节点", $_cluster_h, RTT);
+    my $allpos_h = _analysis_clipos($self, "节点(下载速度|延时|访问比例)", $_cluster_h, RTT);
 
     # select cluster to service region
     _analysis_cluster($self, "优先调度节点", $_cluster_h, $allpos_h);
@@ -228,7 +230,7 @@ sub tofile()
     # analysis region => cluster
     _analysis_region($self, "区域访问节点", $_cluster_h);
 
-    _analysis_clipos($self, "源站", $_site_h, NORTT);
+    _analysis_clipos($self, "源站(下载速度|访问比例)", $_site_h, NORTT);
     
     $self->{excel_hld}->destroy();
 }
@@ -319,15 +321,17 @@ sub _analysis_cluster($$$$)
         }
 
         if ($select_clu) {
-            my ($downspeed, $rtt, $rtt_rate) = (0, 0, 0);
+            my ($downspeed, $percent, $rtt, $rtt_rate) = (0, 0, 0, 0);
             if (exists($cluster_h->{$select_clu}{pos}{$kreg}{download_rate})) {
                 $downspeed = $cluster_h->{$select_clu}{pos}{$kreg}{download_rate};
+                $percent = _round($cluster_h->{$select_clu}{pos}{$kreg}{rate}, 2);
             }
             if (exists($_rtt_h->{$select_clu}{$kreg}{rtt})) {
                 $rtt = $_rtt_h->{$select_clu}{$kreg}{rtt};
                 $rtt_rate = $_rtt_h->{$select_clu}{$kreg}{rtt_rate};
             }
             $selector_h->{$select_clu}{$kreg}{downspeed} = $downspeed;
+            $selector_h->{$select_clu}{$kreg}{percent} = $percent;
             $selector_h->{$select_clu}{$kreg}{rtt} = $rtt;
             $selector_h->{$select_clu}{$kreg}{rtt_rate} = $rtt_rate;
         }
@@ -344,7 +348,7 @@ sub _log_selector_excel($$$$$)
     my ($row, $col, $total) = (0, 0, 0);
 
     my $excel_hld = $self->{excel_hld};
-    my $sheet = $excel_hld->add_sheet("$name(下载速度|延时)");
+    my $sheet = $excel_hld->add_sheet($name);
     $excel_hld->set_column_width($sheet, 0, 0, 20);
     $excel_hld->set_column_width($sheet, 1, 1000, 15);
 
@@ -375,13 +379,14 @@ sub _log_selector_excel($$$$$)
             ++$col;
             if (exists($selector_h->{$kclu}{$kreg})) {
                 my $downspeed = $selector_h->{$kclu}{$kreg}{downspeed};
+                my $percent = $selector_h->{$kclu}{$kreg}{percent};
                 my $rtt = $selector_h->{$kclu}{$kreg}{rtt};
                 my $rtt_rate = $selector_h->{$kclu}{$kreg}{rtt_rate};
-                my ($text, $color) = _color_data($kclu, $kreg, $downspeed, 100, RTT);
+                my ($text, $color) = _color_data($kclu, $kreg, $downspeed, $percent, RTT, SELECTOR);
                 if ($color) {
-                    $excel_hld->write($sheet, $row, $col, "$downspeed|$rtt|$rtt_rate", "black", $color);
+                    $excel_hld->write($sheet, $row, $col, $text, "black", $color);
                 } else {
-                    $excel_hld->write($sheet, $row, $col, "$downspeed|$rtt|$rtt_rate");
+                    $excel_hld->write($sheet, $row, $col, $text);
                 }
             }
         }
@@ -446,7 +451,7 @@ sub _log_region_excel($$$$)
     my ($row, $col) = (0, 0);
 
     my $excel_hld = $self->{excel_hld};
-    my $sheet = $excel_hld->add_sheet("$name");
+    my $sheet = $excel_hld->add_sheet($name);
     $excel_hld->set_column_width($sheet, 0, 0, 16);
     $excel_hld->set_column_width($sheet, 2, 1000, 17);
 
@@ -577,7 +582,7 @@ sub _log_cnt_download_excel($$$$$$)
     my ($row, $col, $total) = (0, 0, 0);
 
     my $excel_hld = $self->{excel_hld};
-    my $sheet = $excel_hld->add_sheet("$name(下载速度|延时|延时比例|访问比例)");
+    my $sheet = $excel_hld->add_sheet($name);
     $excel_hld->set_column_width($sheet, 0, 0, 20);
     $excel_hld->set_column_width($sheet, 2, 1000, 12);
 
@@ -623,7 +628,7 @@ sub _log_cnt_download_excel($$$$$$)
                 $downspeed = 0;
             }
 
-            my ($text, $color) = _color_data($k1, $k2, $downspeed, $rate, $is_rtt);
+            my ($text, $color) = _color_data($k1, $k2, $downspeed, $rate, $is_rtt, NO_SELECTOR);
             if ($color) {
                 $excel_hld->write($sheet, $row, $col, $text, "black", $color);
             } else {
@@ -653,12 +658,14 @@ sub _show_help($$$$)
     $excel_hld->write($sheet, $row, $col, "访问量>5%, 下载<700KB/s", "black", "red");
     ++$row;
     $excel_hld->write($sheet, $row, $col, "访问量>5%, RTT>40ms或者RTT<40ms百分比小于80%", "black", "pink");
+    ++$row;
+    $excel_hld->write($sheet, $row, $col, "被选择节点但访问量小于5%", "black", "orange");
 }
 
-sub _color_data($$$$$)
+sub _color_data($$$$$$)
 {
-    my ($cluster, $region, $downspeed, $rate, $is_rtt) = @_;
-    my ($text, $color) = ("", undef);
+    my ($cluster, $region, $downspeed, $rate, $is_rtt, $is_selector) = @_;
+    my ($text, $color) = ("", "white");
     my ($rtt_time, $rtt_rate) = (0, 0);
 
     if ($is_rtt && exists($_rtt_h->{$cluster}{$region}{rtt})) {
@@ -679,11 +686,23 @@ sub _color_data($$$$$)
     # 2. rtt < 40ms and below 80% or
     # 3. rtt > 40ms
     #
-    if ($rate >= 5) {
+    if (!$is_selector && ($rate >= 5)) {
         if (($rtt_time > 0) && (($rtt_rate < 80 && $rtt_time < 40) || ($rtt_time > 40))) {
             $color = "pink";
         } elsif ($downspeed > 0 && $downspeed < 700) {
             $color = "red";
+        } else {
+            $color = "lime";
+        }
+    }
+
+    if ($is_selector) {
+        if (($rtt_time > 0) && (($rtt_rate < 80 && $rtt_time < 40) || ($rtt_time > 40))) {
+            $color = "pink";
+        } elsif ($downspeed > 0 && $downspeed < 700) {
+            $color = "red";
+        } elsif ($rate < 5) {
+            $color = "orange";
         } else {
             $color = "lime";
         }

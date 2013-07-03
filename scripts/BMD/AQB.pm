@@ -5,6 +5,15 @@ use strict;
 use Data::Dumper;
 use BMD::DBH;
 
+my $_dbh = undef;
+my ($_dbhost, $_dbuser, $_dbpass, $_dbname, $_dbport) = (
+    "127.0.0.1",
+    "user",
+    "passwd",
+    "owdb",
+    "3306"
+);
+
 sub new()
 {
     my $invocant = shift;
@@ -15,23 +24,16 @@ sub new()
     };
 
     _load_db_conf();
+    _conn_db();
 
+    $self->{dbh} = $_dbh;
     bless($self, $class);
     return $self;
 }
 
-my $_dbh = undef;
-my ($_dbhost, $_dbuser, $_dbpass, $_dbname, $_dbport) = (
-    "127.0.0.1",
-    "user",
-    "passwd",
-    "owdb",
-    "3306"
-);
-
 sub _load_db_conf()
 {
-    my $conf_file = '/home/apuadmin/baiyu/antnest.conf.net';
+    my $conf_file = '/home/apuadmin/baiyu/antnest.conf';
     open(DB_CONFIG, $conf_file) or die("ERR: can't open $conf_file : $!");
 
     while (<DB_CONFIG>) {
@@ -84,6 +86,7 @@ use constant {
     SCHED_NAME    => 1,
     SCHED_IP      => 2,
     SCHED_IPALIAS => 3,
+    SCHED_TIME    => 4,
 };
 
 sub get_schedule_info($)
@@ -93,8 +96,7 @@ sub get_schedule_info($)
     return if (!defined($siteid));
     my $sched_h = undef;
 
-    my $sql = qq/select id,name,ipaddr,ipalias from schedulemap,clusters where id=clusterid and siteid=$siteid/;
-    _conn_db();
+    my $sql = qq/select id,name,ipaddr,ipalias,statustime from schedulemap,clusters where id=clusterid and siteid=$siteid/;
     my $recs = $_dbh->query($sql);
     for (my $i = 0; $i <= $#$recs; $i++) {
         my $cluster = $recs->[$i]->[SCHED_NAME];
@@ -102,8 +104,8 @@ sub get_schedule_info($)
         $sched_h->{$cluster}{'name'}    = $recs->[$i][SCHED_NAME];
         $sched_h->{$cluster}{'ip'}      = $recs->[$i][SCHED_IP];
         $sched_h->{$cluster}{'ipalias'} = $recs->[$i][SCHED_IPALIAS];
+        $sched_h->{$cluster}{'time'}    = $recs->[$i][SCHED_TIME];
     }
-    _close_db();
 
     return $sched_h;
 }
@@ -134,7 +136,6 @@ sub get_site_info($)
     return $self->{site}{$name} if exists($self->{site}{$name});
 
     my $sql = qq/select id,ip,type,dns,domain_id,rev,whole_name from records where whole_name="$name"/;
-    _conn_db();
     my $recs = $_dbh->query($sql);
     if ($#$recs > -1) {
         $site_h->{'id'}         = $recs->[0][RECORD_ID];
@@ -169,7 +170,6 @@ sub get_site_info($)
     }
 
     $site_h->{'config'} = $conf_h;
-    _close_db();
     
     $self->{site}{$name} = $site_h;
     return $self->{site}{$name};
@@ -195,7 +195,6 @@ sub get_domain_info($)
     return if (!defined($name));
     my $domain_h = undef;
     my $sql = qq/select id,domain,status,user_id,ns,check_time,sitedefault,type,dnsserver,checkin from domain where domain='$name'/;
-    _conn_db();
     my $recs = $_dbh->query($sql);
     if ($#$recs > -1) {
         $domain_h->{'domain_id'}   = $recs->[0][DOMAIN_ID];
@@ -209,7 +208,6 @@ sub get_domain_info($)
         $domain_h->{'dns_srv'}     = $recs->[0][DNS_SRV];
         $domain_h->{'checkin'}     = $recs->[0][CHECKIN];
     }
-    _close_db();
 
     return $domain_h;
 }
@@ -237,7 +235,6 @@ sub get_cluster_info($)
     return $self->{cluster}{$name} if exists($self->{cluster}{$name});
     
     my $sql = qq/select id,lower(name),ipaddr,location,idc,schedule,bandwidth,ipalias from clusters/;
-    _conn_db();
     my $recs = $_dbh->query($sql);
     for (my $i = 0; $i <= $#$recs; ++$i) {
         $cluster_h->{$recs->[$i][CLUSTER_NAME]}{id}       = $recs->[$i][CLUSTER_ID];
@@ -249,7 +246,6 @@ sub get_cluster_info($)
         $cluster_h->{$recs->[$i][CLUSTER_NAME]}{band}     = $recs->[$i][CLUSTER_BAND];
         $cluster_h->{$recs->[$i][CLUSTER_NAME]}{ipalias}  = $recs->[$i][CLUSTER_IPALIAS];
     } 
-    _close_db();
 
     $self->{cluster} = $cluster_h;
 
@@ -259,6 +255,7 @@ sub get_cluster_info($)
 
 sub destroy()
 {
+    my $self = shift;
     _close_db() if ($_dbh);
 }
 

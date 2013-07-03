@@ -11,6 +11,7 @@ use Speedy::Utils;
 use Data::Dumper;
 use BMD::DBH;
 use BMD::IPOS;
+use BMD::CESU;
 use Time::Interval;
 use Getopt::Long;
 use Smart::Comments;
@@ -122,6 +123,9 @@ sub vs_rate($$$$$)
     return $vs_href;
 }
 
+#
+# compare each time aqb vs org
+#
 my $cesu_sites_aref;
 sub speed_data_analysis($)
 {
@@ -626,11 +630,24 @@ sub cache_hit_log($)
 
     printf($analysis_fp "\n### 缓存命中率 %s ###\n" .
         "缓存命中率: %.2f%%, 缓存率: %.2f%%\n" .
-        "HIT总体命中率: %.2f%%, HIT总体缓存率: %.2f%%\n" .
+        "总节省pv百分比: %.2f%%, 总节省流量百分比: %.2f%%\n" .
         "总日志数: %.2f亿, 总流量: %.2fG\n\n",
         $today, $cachehit, $cacherate,
         $hit * 100 / $total, $hit_flow * 100 / $total_flow,
         $total / 100000000, $total_flow / 1024 / 1024 /1024);
+}
+
+sub ddos_site_log()
+{
+    my $cesu_hld = BMD::CESU->new();
+    my $ddos_info = $cesu_hld->get_ddos_site();
+
+    printf($analysis_fp "调度抗D节点3天以上站数: %d\n" .
+        "占总测试站百分比: %.2f%%\n" .
+        "平均在抗D时间: %.2f天\n\n",
+        $ddos_info->{ddos},
+        $ddos_info->{ddos} * 100 / $ddos_info->{total},
+        $ddos_info->{avg_day});
 }
 
 sub get_ipseg($)
@@ -917,11 +934,24 @@ if ($site_arg) {
 
     cluster_slow_log($yesterday, $today);
 
+    printf($analysis_fp "\n### 抗D网站统计 ###\n");
+    ddos_site_log();
+
     close($analysis_fp);
 
     #
     # dnspod cesu data
     #
+    $dbh = BMD::DBH->new(
+        'dbhost' => '116.213.78.228',
+        'dbuser' => 'cesutest',
+        'dbpass' => 'cesutest',
+        #'dbuser' => 'cesureadonly',
+        #'dbpass' => '66ecf9c968132321a02e6e7aff34ce5d',
+        'dbname' => 'speed',
+        'dbport' => 3306
+    );
+
     open(my $dnspod_fp, ">/tmp/dnspod_daily.txt");
     printf($dnspod_fp "\n对比%s和%s的测速数据\n", $yesterday, $today);
     cesu_daily_log($yesterday, $today, "dnspod", $dnspod_fp);
