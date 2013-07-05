@@ -23,22 +23,26 @@ sub new()
     return $self;
 }
 
-sub query($)
+sub query($;$$)
 {
     my $self = shift;
-    my $url = shift;
+    my ($url, $ishead, $proxy) = @_;
+    $ishead = 0 unless $ishead;
 
     my %http_h = ();
-    if (!defined($url)) {
-        return undef;
-    }
-    
     my $curl = WWW::Curl::Easy->new();
 
-    $curl->setopt(CURLOPT_HEADER, 1);
     $curl->setopt(CURLOPT_URL, $url);
-    $curl->setopt(CURLOPT_CONNECTTIMEOUT, 20);
-    $curl->setopt(CURLOPT_TIMEOUT, 30);
+    $curl->setopt(CURLOPT_CONNECTTIMEOUT, 5);
+    $curl->setopt(CURLOPT_TIMEOUT, 5);
+    # not inlcude header in response
+    $curl->setopt(CURLOPT_HEADER, 0);
+    # follow redirect
+    $curl->setopt(CURLOPT_FOLLOWLOCATION, 1);
+    # not include body in response
+    $curl->setopt(CURLOPT_NOBODY, $ishead);
+    # set proxy
+    $curl->setopt(CURLOPT_PROXY, $proxy) if $proxy;
 
     # a filehandle, reference to a scalar or reference to a typeglob can be used here.
     my $response_header;
@@ -54,7 +58,6 @@ sub query($)
 
     # looking at the results...
     if ($retcode == 0) {
-        $response_body = $1 if ($response_body =~ m/^${response_header}(.*)$/s);
         $response_header =~ s/%/%%/g;
         $response_body =~ s/%/%%/g;
 
@@ -88,7 +91,7 @@ sub query($)
         #print("Received response: $response_header\n");
     } else {
         # Error code, type of error, error message
-        print("ERR($url): $retcode " . $curl->strerror($retcode) . " " . $curl->errbuf . "\n") if $debug;
+        printf("ERR($url): $retcode " . $curl->strerror($retcode) . " " . $curl->errbuf . "\n") if $debug;
         return;
     }
 
