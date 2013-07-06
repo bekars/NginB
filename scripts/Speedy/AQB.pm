@@ -20,7 +20,7 @@ my ($dbhost, $dbuser, $dbpass, $dbname, $dbport);
 
 sub load_db_config
 {
-    my $conf_file_path = '/home/apuadmin/baiyu/antnest.conf.net';
+    my $conf_file_path = '/home/apuadmin/baiyu/antnest.conf';
     open(DB_CONFIG, $conf_file_path) or die("ERR: can't open $conf_file_path : $!");
 
     $dbname = "owdb";
