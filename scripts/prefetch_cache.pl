@@ -1,4 +1,8 @@
 #!/usr/bin/perl -w
+#
+# example:
+#   ./prefetch_cache.pl --url http://test.weiweimeishi.com/huohua/movie/1-20small/51a877a814215c1ae800004f.flv
+#
 use strict;
 use warnings;
 use Data::Dumper;
@@ -7,7 +11,7 @@ use WWW::Curl::Easy;
 
 my @cluster = qw/61.147.79.211 61.147.79.211/;
 
-my $url = qq/http:\/\/test.weiweimeishi.com\/huohua\/movie\/1-20small\/51a877a814215c1ae800004f.flv/;
+my $url = undef;
 
 my $total = $#cluster;
 ++$total;
@@ -79,6 +83,7 @@ sub fetch_cache($;$$)
     $_cache_status = "MISS";
     my $retcode = $curl->perform();
     
+    printf("                           \r");
     if ($retcode == 0) {
         $http_h->{URL} = $url;
         $http_h->{HEADER} = $response_header;
@@ -110,6 +115,7 @@ GetOptions(
 );
 
 showhelp() if ($showhelp);
+showhelp() unless ($url);
 
 foreach my $kip (@cluster) {
     printf("[PREFETCH %d/%d]\n", ++$cnt, $total);
@@ -126,9 +132,10 @@ if ($success == $total) {
     printf("PREFETCH OK!\n");
 } else {
     printf("PREFETCH ERR!\n");
+    exit(0);
 }
 
-1;
+exit(1);
 
 # vim: ts=4:sw=4:et
 
