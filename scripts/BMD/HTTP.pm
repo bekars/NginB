@@ -161,8 +161,8 @@ sub fetch_cache($;$$)
     my $response_body = "";
     $curl->setopt(CURLOPT_HEADERDATA, \$response_header);
     $curl->setopt(CURLOPT_WRITEDATA, \$response_body);
-    $curl->setopt(CURLOPT_TRANSFER_ENCODING, 1);
-    $curl->setopt(CURLOPT_ACCEPT_ENCODING, "gzip");
+    #$curl->setopt(CURLOPT_TRANSFER_ENCODING, 1);
+    #$curl->setopt(CURLOPT_ACCEPT_ENCODING, "gzip");
     $curl->setopt(CURLOPT_HEADERFUNCTION, \&_header_callback);
     $curl->setopt(CURLOPT_WRITEFUNCTION, \&_body_callback);
 

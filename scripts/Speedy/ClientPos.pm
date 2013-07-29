@@ -230,7 +230,7 @@ sub tofile()
     # analysis region => cluster
     _analysis_region($self, "区域访问节点", $_cluster_h);
 
-    _analysis_clipos($self, "源站(下载速度|访问比例)", $_site_h, NORTT);
+    #_analysis_clipos($self, "源站(下载速度|访问比例)", $_site_h, NORTT);
     
     $self->{excel_hld}->destroy();
 }
@@ -278,7 +278,7 @@ sub _analysis_ip_region($$)
     return 1;
 }
 
-use constant { MAX_PERCENT => 100 };
+use constant { MAX_PERCENT => 70 };
 sub _analysis_cluster($$$$)
 {
     my ($self, $name, $cluster_h, $allpos_h) = @_;

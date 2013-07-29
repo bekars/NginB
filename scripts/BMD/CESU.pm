@@ -112,6 +112,7 @@ sub get_ddos_site()
     my ($total_site, $ddos_site) = (0, 0);
     my $total_day = 0;
 
+    open(my $fp, ">ddos_site.txt");
     my $recs = $_dbh->query($sql);
     my $aqb_hld = BMD::AQB->new();
     for (my $i = 0; $i <= $#$recs; $i++) {
@@ -127,6 +128,7 @@ sub get_ddos_site()
                 if ($interval > 3) {
                     $site_h->{site}{$site} = $interval;
                     ++$ddos_site;
+                    printf($fp "$site\n");
                 }
             }
         }
@@ -136,6 +138,8 @@ sub get_ddos_site()
     $site_h->{total} = $total_site;
     $site_h->{ddos} = $ddos_site;
     $site_h->{avg_day} = $total_day / $site_h->{total};
+
+    close($fp);
 
     return $site_h;
 }

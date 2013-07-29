@@ -144,7 +144,7 @@ sub getSiteInfo($)
         return \%site_h;
     }
     
-    my $sql = qq/select id,ip,type,dns,domain_id,rev,whole_name from records where whole_name="$name"/;
+    my $sql = qq/select  id,ip,type,dns,domain_id,rev,whole_name from records where whole_name="$name"/;
     my $recs = runSQL($sql);
     if ($#$recs >= 0) {
         $site_h{'id'} = $recs->[0]->[RECORD_ID];

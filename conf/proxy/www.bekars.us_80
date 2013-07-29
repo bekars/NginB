@@ -3,10 +3,17 @@ proxy_cache_path /data/nginx/cache/www.bekars.us levels=1 keys_zone=www.bekars.u
 upstream www.bekars.us {
     server 107.21.216.100 max_fails=1 fail_timeout=10s;
     server 64.74.223.34 backup;
+    keepalive 16;
 }
 
 server {
     server_name  www.bekars.us; 
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Server $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
 
     access_log "/usr/local/nginx/logs/access_www.bekars.us_80.log"  main;
 
@@ -19,16 +26,16 @@ server {
     gzip_disable   "MSIE [1-6].";
 
     location / {
+        proxy_ignore_headers Expires Cache-Control Set-Cookie;
         proxy_pass     http://www.bekars.us;
         proxy_redirect off;
 
-        location ~* \.(htm|html)$|^/$ {
+        more_set_headers 'Last-Modified:';
+        more_set_headers 'Cache-Control: public, max-age=3600';
+        location ~* /$|\.(htm|html)$ {
             proxy_pass http://www.bekars.us;
             proxy_redirect off;
-            proxy_cache www.bekars.us;
-            
-            more_set_headers 'Last-Modified:';
-            more_set_headers 'Cache-Control: no-cache, max-age=3600';
+#     proxy_cache www.bekars.us;
         }
 
         location ~* \.(gif|jpg|jpeg|png|bmp|swf|js|css)$ {
