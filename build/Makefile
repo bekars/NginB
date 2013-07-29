@@ -1,4 +1,4 @@
-TOP_PATH          = /home/baiyu/GitHub/NginB
+TOP_PATH          = /home/baiyu/Git/NginB
 NGX_PATH          = $(TOP_PATH)/nginx-1.2.4
 NGX_MOD_PATH      = $(TOP_PATH)/modules
 NGX_MOD_MORE_PATH = $(NGX_PATH)/src/nginx_mods
