@@ -33,7 +33,8 @@ static void ngx_http_upstream_send_request(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
 static void ngx_http_upstream_send_request_handler(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
-static void ngx_http_upstream_process_header(ngx_http_request_t *r,
+//static void ngx_http_upstream_process_header(ngx_http_request_t *r,
+void ngx_http_upstream_process_header(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
 static ngx_int_t ngx_http_upstream_test_next(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
@@ -44,7 +45,8 @@ static ngx_int_t ngx_http_upstream_process_headers(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
 static void ngx_http_upstream_process_body_in_memory(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
-static void ngx_http_upstream_send_response(ngx_http_request_t *r,
+//static void ngx_http_upstream_send_response(ngx_http_request_t *r,
+void ngx_http_upstream_send_response(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
 static void
     ngx_http_upstream_process_non_buffered_downstream(ngx_http_request_t *r);
@@ -1496,7 +1498,8 @@ ngx_http_upstream_send_request_handler(ngx_http_request_t *r,
 }
 
 
-static void
+//static void
+void
 ngx_http_upstream_process_header(ngx_http_request_t *r, ngx_http_upstream_t *u)
 {
     ssize_t            n;
@@ -2043,7 +2046,8 @@ ngx_http_upstream_process_body_in_memory(ngx_http_request_t *r,
 }
 
 
-static void
+//static void
+void 
 ngx_http_upstream_send_response(ngx_http_request_t *r, ngx_http_upstream_t *u)
 {
     int                        tcp_nodelay;
@@ -3129,6 +3133,11 @@ ngx_http_upstream_process_content_length(ngx_http_request_t *r,
 
     u->headers_in.content_length = h;
     u->headers_in.content_length_n = ngx_atoof(h->value.data, h->value.len);
+
+    if ((NGX_CONF_UNSET_SIZE != u->conf->max_cache_file_size) && 
+        ((size_t)u->headers_in.content_length_n > u->conf->max_cache_file_size)) {
+        u->cacheable = 0;
+    }
 
     return NGX_OK;
 }

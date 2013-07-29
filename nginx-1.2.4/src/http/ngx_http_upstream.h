@@ -172,6 +172,7 @@ typedef struct {
     ngx_array_t                     *cache_valid;
     ngx_array_t                     *cache_bypass;
     ngx_array_t                     *no_cache;
+    size_t                           max_cache_file_size;
 #endif
 
     ngx_array_t                     *store_lengths;
