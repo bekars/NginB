@@ -1,0 +1,14 @@
+#
+# forward proxy for hop cluster
+#
+
+server {
+    listen 8282 default backlog=1024;
+    access_log "/usr/local/apache2/logs/access_Hop.log"  main;
+
+    location / {
+        proxy_pass $scheme://$http_x_hop_to$request_uri;
+        proxy_redirect off;
+    }
+}
+
