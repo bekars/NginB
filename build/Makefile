@@ -25,7 +25,7 @@ NGX_MOD_CONFIG    = \
 	--add-module=${NGX_MOD_PATH}/mod_minify \
 	--add-module=${NGX_MOD_PATH}/mod_capcache \
 	--add-module=${NGX_MOD_PATH}/mod_aqb
-		
+
 
 all: config build
 
@@ -41,6 +41,10 @@ build:
 PHONY += clean
 clean:
 	cd ${NGX_PATH} && make clean
+
+PHONY += install
+install:
+	cd ${NGX_PATH} && make install
 
 .PHONY: $(PHONY)
 
