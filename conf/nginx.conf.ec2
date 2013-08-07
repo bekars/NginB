@@ -125,6 +125,8 @@ http {
         #    deny  all;
         #}
     }
+    
+    include /usr/local/nginx/conf/proxy/*;
 
     server {
         listen       80;
