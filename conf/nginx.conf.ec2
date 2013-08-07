@@ -72,6 +72,7 @@ http {
         }
 
         location / {
+            more_set_headers 'Cache-Control: max-age=3600';
             root  html/wordpress;
             index  index.php;
         }
@@ -81,6 +82,13 @@ http {
 #more_set_headers -t 'text/plain text/css text/html' 'Content-Type: text/foo';
         }
 
+        location /cesu {
+#echo $remote_addr;
+            content_by_lua '
+                --ngx.say(ngx.var.remote_addr);
+                return ngx.redirect("http://"..ngx.var.remote_addr.."/200k.jpg");
+            ';
+        }
 #        location ~ .*\.(js|css|gif|jpg|jpeg|png|bmp|swf)$ {
 #            expires 6m;
 #        }
@@ -137,6 +145,7 @@ http {
         location / {
             root   html/wordpress;
             index  index.php;
+#more_set_headers 'Cache-Control: private';
         }
     }
 
