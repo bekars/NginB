@@ -183,6 +183,7 @@ http {
 
     include /usr/local/nginx/conf/proxy/*;
     include /usr/local/nginx/conf/nginx.conf.cachesrv;
+    include /usr/local/nginx/conf/nginx.conf.hop;
 }
 
 
