@@ -1,7 +1,6 @@
 proxy_cache_path /data/nginx/cache/www.baiyu.org.cn levels=1 keys_zone=www.baiyu.org.cn:5m inactive=9h max_size=10m;
 
 upstream www.baiyu.org.cn {
-	server 107.21.216.100;
 	server 42.96.137.181;
 	keepalive 32;
 }
@@ -41,13 +40,6 @@ server {
 	}
 
 	proxy_cache_valid 200 9h;
-    proxy_set_header ORG_IP '$proxy_host $proxy_port';
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-Host $host; 
-    proxy_set_header X-Forwarded-Server $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header Connection "";
 
 	location = / {
 		proxy_pass     http://www.baiyu.org.cn;
