@@ -35,7 +35,7 @@ server {
         location ~* /$|\.(htm|html)$ {
             proxy_pass http://www.bekars.us;
             proxy_redirect off;
-#     proxy_cache www.bekars.us;
+            proxy_cache www.bekars.us;
         }
 
         location ~* \.(gif|jpg|jpeg|png|bmp|swf|js|css)$ {

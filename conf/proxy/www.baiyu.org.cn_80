@@ -7,7 +7,13 @@ upstream www.baiyu.org.cn {
 
 server {
 	server_name  www.baiyu.org.cn ; 
-
+    set $data_path $uri;
+    if ($uri ~ ^/.+/data/(.*)$) {
+        set $data_path /data/$1;
+    }
+    proxy_cache_key "$scheme:$host$data_path";
+    rewrite ^/.+/data/(.*)$ /data/$1 last;
+    
 	referer_hash_bucket_size 128; 
 	referer_hash_max_size 4096; 
 
@@ -51,6 +57,14 @@ server {
 	location / {
 		proxy_pass     http://www.baiyu.org.cn;
 		proxy_redirect off;
+
+		location ~* \.(xml)$ {
+			proxy_pass     http://www.baiyu.org.cn;
+			proxy_redirect off;
+
+			proxy_cache www.baiyu.org.cn;
+	        proxy_cache_valid 200 10m;
+        }
 
 		location ~* \.(gif|jpg|jpeg|png|bmp|swf|js|css|ico|mp3|txt|wma|zip|exe|bin|7z|pdf|cab|wmv|mdb|wav|flv|sisx|dat|rar|apk|mp4)$ {
 			proxy_pass     http://www.baiyu.org.cn;
