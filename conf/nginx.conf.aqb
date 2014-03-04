@@ -3,7 +3,7 @@ worker_rlimit_nofile 42767;
 worker_rlimit_core   500M;
 working_directory    /tmp/;
 #worker_cpu_affinity 0001 0010 0100 1000;
-worker_processes     1;
+worker_processes     4;
 
 
 #error_log  logs/error.log;
@@ -12,12 +12,12 @@ error_log  logs/error.log  debug;
 
 pid        logs/nginx.pid;
 
-daemon         off;
-master_process off;
+daemon         on;
+master_process on;
 
 
 events {
-    worker_connections  40000;
+    worker_connections  4000;
 }
 
 http {
@@ -27,9 +27,14 @@ http {
     client_header_buffer_size 4k;
     large_client_header_buffers 4 32k;
 
-    more_set_headers 'Server: BLW-NGX' 'B-Cache-Status: $upstream_cache_status';
+    more_set_headers 'Server: BWD-NGX' 'B-Cache-Status: $upstream_cache_status';
 
     log_format  main     '$remote_addr $hostname $remote_user [$time_local] "$request" '
+        '$status $body_bytes_sent "$http_referer" '
+        '"$http_user_agent" "$http_x_forwarded_for" "$http_cookie" $upstream_cache_status '
+        '"$upstream_http_expires" "$upstream_http_cache_control" "$upstream_http_etag" "$upstream_http_last_modified" '
+        '$request_time $upstream_response_time "$request_body"'; 
+    log_format  full     '$remote_addr $hostname $remote_user [$time_local] "$request" '
         '$status $body_bytes_sent "$http_referer" '
         '"$http_user_agent" "$http_x_forwarded_for" "$http_cookie" $upstream_cache_status '
         '"$upstream_http_expires" "$upstream_http_cache_control" "$upstream_http_etag" "$upstream_http_last_modified" '
@@ -81,6 +86,8 @@ http {
         10.18.102.195/32 127.0.0.1:8888; 
     }
 
+    proxy_cache_path /data/nginx/cache_cesu levels=1 keys_zone=cesucache:5m inactive=7d max_size=50m;
+
     server {
         listen 80;
         server_name localhost;
@@ -127,6 +134,27 @@ http {
             echo_before_body bekars;
         }
 
+        # parse url args
+        # curl http://127.0.0.1/cesu?host=www.baiyu.net.cn\&ip=42.96.137.181
+        location /aqb-cesu {
+            resolver 8.8.8.8;
+            if ( $http_x_anquanbao_speed != CESU ) {
+                return 404;
+            }
+            proxy_set_header Host $arg_host;
+            proxy_set_header X-Anquanbao-Speed "";
+            if ( $arg_ip != "" ) {
+			    proxy_pass http://$arg_ip/;
+            }
+            if ( $arg_ip = "" ) {
+			    proxy_pass http://$arg_host/;
+            }
+	        proxy_cache_valid 200 301 302 7d;
+			proxy_redirect off;
+            proxy_ignore_headers Cache-Control Expires Set-Cookie;
+		    proxy_cache cesucache;
+        }
+
         # fcgi test
         location /test.cgi {
             allow 127.0.0.1;
@@ -155,15 +183,29 @@ http {
             fastcgi_param  REDIRECT_STATUS    200;
         }
 
-        location /perl.cgi {
-            allow 127.0.0.1;
-            deny all;
-#gzip off;
-            fastcgi_pass  127.0.0.1:9800;
-            fastcgi_index site_tools.pl;
-            fastcgi_param SCRIPT_FILENAME $document_root/site_tools.pl;
-            include fastcgi_params;
-            root /home/baiyu/AnQuanBao/jupiter/config_agent/configagent/site_tools;
+        location /api/sitecatcher.cgi {
+            fastcgi_pass        127.0.0.1:9800;
+            fastcgi_connect_timeout     100s;
+            fastcgi_index       sitecatcher.pl;
+            fastcgi_param       SCRIPT_FILENAME $document_root/sitecatcher.pl;
+            include     fastcgi_params;
+            root        /opt/nevel/sitecatcher/bin/;
+        }
+
+        location /api/deletecache {
+            proxy_read_timeout 600;
+            proxy_pass http://mojo_app;
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-HTTPS 0;
+        }
+
+        location /api/agent {
+            proxy_read_timeout 600;
+            proxy_pass http://mojo_app;
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-HTTPS 0;
         }
 
         location = /200k.jpg {
@@ -181,9 +223,13 @@ http {
 
 #    chunkin on;
 
+#if ($host ~ www\.baiyu\.org\.cn) {
+#        rewrite ^/.+/data/(.*)$ /data/$1 last;
+#    }
     include /usr/local/nginx/conf/proxy/*;
     include /usr/local/nginx/conf/nginx.conf.cachesrv;
     include /usr/local/nginx/conf/nginx.conf.hop;
+    include /usr/local/nginx/conf/nginx.conf.mojo;
 }
 
 
