@@ -1,8 +1,8 @@
 TOP_PATH          = /home/baiyu/Git/NginB
-NGX_PATH          = $(TOP_PATH)/nginx-1.2.4
+NGX_VER 		  = 1.6.0
+NGX_PATH          = $(TOP_PATH)/nginx-$(NGX_VER)
 NGX_MOD_PATH      = $(TOP_PATH)/modules
-NGX_MOD_MORE_PATH = $(NGX_PATH)/src/nginx_mods
-NGX_PAGESPEED     = src/nginx_mods
+NGX_MOD_MORE_PATH = $(TOP_PATH)/ngx_mods
 
 NGX_MOD_CONFIG    = \
 	--error-log-path=/var/log/error.log \
@@ -15,16 +15,17 @@ NGX_MOD_CONFIG    = \
 	--with-http_sub_module \
 	--with-http_stub_status_module \
 	--http-proxy-temp-path=/data/nginx/cache_tmp \
+	--add-module=${NGX_MOD_MORE_PATH}/headers-more-nginx-module \
 	--add-module=${NGX_MOD_MORE_PATH}/echo-nginx-module \
 	--add-module=${NGX_MOD_MORE_PATH}/ngx_devel_kit \
-	--add-module=${NGX_MOD_MORE_PATH}/lua-nginx-module \
-	--add-module=${NGX_MOD_MORE_PATH}/headers-more-nginx-module \
-	--add-module=${NGX_PAGESPEED}/ngx_pagespeed \
-	--add-module=${NGX_MOD_MORE_PATH}/srcache-nginx-module \
-	--add-module=${NGX_MOD_PATH}/mod_breakpoint \
-	--add-module=${NGX_MOD_PATH}/mod_minify \
-	--add-module=${NGX_MOD_PATH}/mod_capcache \
-	--add-module=${NGX_MOD_PATH}/mod_aqb
+	--add-module=${NGX_MOD_MORE_PATH}/lua-nginx-module
+#	--add-module=${NGX_MOD_MORE_PATH}/srcache-nginx-module \
+#	--add-module=${NGX_MOD_PATH}/mod_breakpoint \
+#	--add-module=${NGX_MOD_PATH}/mod_minify \
+#	--add-module=${NGX_MOD_PATH}/mod_capcache \
+#	--add-module=${NGX_MOD_PATH}/mod_aqb \
+#	--add-module=${NGX_MOD_PATH}/ngx_pagespeed \
+#	--add-module=${NGX_MOD_PATH}/ngx_http_coolplay_filter_module
 
 
 all: config build
