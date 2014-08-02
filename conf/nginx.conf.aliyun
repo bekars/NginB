@@ -41,7 +41,7 @@ http {
 #    gzip_types text/plain application/xml application/x-javascript text/javascript text/css;
 
     resolver 202.106.0.20;
-    more_set_headers 'Server: BLW-ALY81';
+    more_set_headers 'Server: BWD-ALY81';
 
     server {
         listen       80;
@@ -93,8 +93,8 @@ http {
         location /cesu {
 #echo $remote_addr;
             content_by_lua '
-                --ngx.say(ngx.var.remote_addr);
-                return ngx.redirect("http://"..ngx.var.remote_addr.."/200k.jpg");
+                ngx.say(ngx.var.remote_addr);
+                --return ngx.redirect("http://"..ngx.var.remote_addr.."/200k.jpg");
             ';
         }
 #        location ~ .*\.(js|css|gif|jpg|jpeg|png|bmp|swf)$ {
