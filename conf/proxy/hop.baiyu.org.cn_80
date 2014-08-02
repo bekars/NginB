@@ -1,0 +1,56 @@
+proxy_cache_path /data/nginx/cache/hop.baiyu.org.cn levels=1 keys_zone=hop.baiyu.org.cn:5m inactive=9h max_size=10m;
+
+upstream hop.baiyu.org.cn {
+	server 42.96.137.181:8282;
+	server 42.96.137.181:80 backup;
+	keepalive 32;
+}
+
+server {
+	server_name  hop.baiyu.org.cn ; 
+
+	referer_hash_bucket_size 128; 
+	referer_hash_max_size 4096; 
+
+	access_log "/usr/local/apache2/logs/access_hop.baiyu.org.cn_80.log"  main;
+
+	set $hosturi hop.baiyu.org.cn_80$uri;
+
+	gzip  on;
+
+	proxy_cache_valid 200 9h;
+    proxy_set_header X-Hop-To 42.96.137.181;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Host $host; 
+    proxy_set_header X-Forwarded-Server $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header Connection "";
+
+	location = / {
+		proxy_pass     http://hop.baiyu.org.cn;
+		proxy_redirect off;
+
+		proxy_cache hop.baiyu.org.cn;
+	}
+
+	location / {
+		proxy_pass     http://hop.baiyu.org.cn;
+		proxy_redirect off;
+
+		location ~* \.(gif|jpg|jpeg|png|bmp|swf|js|css|ico|mp3|txt|wma|zip|exe|bin|7z|pdf|cab|wmv|mdb|wav|flv|sisx|dat|rar|apk|mp4)$ {
+			proxy_pass     http://hop.baiyu.org.cn;
+			proxy_redirect off;
+
+			proxy_cache hop.baiyu.org.cn;
+
+			valid_referers none blocked baiyu.org.cn *.baiyu.org.cn *.baidu.com *.bing.com *.google.com *.google.com.hk *.jike.com *.sogou.com *.soso.com *.youdao.com ;
+			if ($invalid_referer) {
+				access_log "/usr/local/nginx/logs/hop.baiyu.org.cn_80_sqlfilter.log" hotlink;
+				return 403;
+			}
+		}
+	}
+
+	listen 80;
+}

@@ -1,7 +1,8 @@
-TOP_PATH          = /home/baiyu/GitHub/NginB
+TOP_PATH          = /home/baiyu/Git/NginB
 NGX_PATH          = $(TOP_PATH)/nginx-1.2.4
 NGX_MOD_PATH      = $(TOP_PATH)/modules
 NGX_MOD_MORE_PATH = $(NGX_PATH)/src/nginx_mods
+NGX_PAGESPEED     = src/nginx_mods
 
 NGX_MOD_CONFIG    = \
 	--error-log-path=/var/log/error.log \
@@ -18,13 +19,13 @@ NGX_MOD_CONFIG    = \
 	--add-module=${NGX_MOD_MORE_PATH}/ngx_devel_kit \
 	--add-module=${NGX_MOD_MORE_PATH}/lua-nginx-module \
 	--add-module=${NGX_MOD_MORE_PATH}/headers-more-nginx-module \
-	--add-module=${NGX_MOD_MORE_PATH}/ngx_pagespeed \
+	--add-module=${NGX_PAGESPEED}/ngx_pagespeed \
+	--add-module=${NGX_MOD_MORE_PATH}/srcache-nginx-module \
 	--add-module=${NGX_MOD_PATH}/mod_breakpoint \
 	--add-module=${NGX_MOD_PATH}/mod_minify \
 	--add-module=${NGX_MOD_PATH}/mod_capcache \
-	--add-module=${NGX_MOD_PATH}/mod_aqb \
-	--add-module=${NGX_MOD_MORE_PATH}/srcache-nginx-module
-		
+	--add-module=${NGX_MOD_PATH}/mod_aqb
+
 
 all: config build
 
@@ -40,6 +41,10 @@ build:
 PHONY += clean
 clean:
 	cd ${NGX_PATH} && make clean
+
+PHONY += install
+install:
+	cd ${NGX_PATH} && make install
 
 .PHONY: $(PHONY)
 

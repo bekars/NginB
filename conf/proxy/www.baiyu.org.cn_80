@@ -1,13 +1,19 @@
-proxy_cache_path /data/nginx/cache/www.baiyu.org.cn levels=1 keys_zone=www.baiyu.org.cn:1m inactive=30m max_size=10m;
+proxy_cache_path /data/nginx/cache/www.baiyu.org.cn levels=1 keys_zone=www.baiyu.org.cn:5m inactive=9h max_size=10m;
 
 upstream www.baiyu.org.cn {
-	server 42.96.137.181 max_fails=1 fail_timeout=10s;
-	server 113.31.65.39 backup;
+	server 42.96.137.181;
+	keepalive 32;
 }
 
 server {
 	server_name  www.baiyu.org.cn ; 
-
+    set $data_path $uri;
+    if ($uri ~ ^/.+/data/(.*)$) {
+        set $data_path /data/$1;
+    }
+    proxy_cache_key "$scheme:$host$data_path";
+    rewrite ^/.+/data/(.*)$ /data/$1 last;
+    
 	referer_hash_bucket_size 128; 
 	referer_hash_max_size 4096; 
 
@@ -15,16 +21,7 @@ server {
 
 	set $hosturi www.baiyu.org.cn_80$uri;
 
-	gzip            on;
-	gzip_min_length 1000;
-	gzip_proxied    expired no-cache no-store private auth;
-	gzip_types      text/plain text/css application/xml application/x-javascript application/javascript text/javascript;
-	gzip_disable   "MSIE [1-6].";
-
-	error_page 411 = @my_411_error;
-	location @my_411_error {
-		chunkin_resume;
-	}
+	gzip  on;
 
 	error_page 405 /error/nsngx_ep_405.html;
 	location = /error/nsngx_ep_405.html {
@@ -40,19 +37,36 @@ server {
 		root /usr/local/nginx/;
 		internal;
 	}
+	error_page 504 /error/nsngx_ep_504.html;
+	location = /error/nsngx_ep_504.html {
+		ssi on;
+		ssi_silent_errors on;
+		root /usr/local/nginx/;
+		internal;
+	}
 
-#   sqlfilter               on;
-#	sqlfilter_log_file      /usr/local/nginx/logs/www.baiyu.org.cn_80_sqlfilter.log;
-#	sqlfilter_deny          on;
-#	smartrule_deny          off;
+	proxy_cache_valid 200 9h;
+
+	location = / {
+		proxy_pass     http://www.baiyu.org.cn;
+		proxy_redirect off;
+
+		proxy_cache www.baiyu.org.cn;
+	}
 
 	location / {
 		proxy_pass     http://www.baiyu.org.cn;
 		proxy_redirect off;
 
-#		include /etc/nginx/rule/file_www.baiyu.org.cn_80;
+		location ~* \.(xml)$ {
+			proxy_pass     http://www.baiyu.org.cn;
+			proxy_redirect off;
 
-		location ~* \.(gif|jpg|jpeg|png|bmp|swf|js|css|ico|mp3|txt|wma|zip|exe|bin|7z|pdf|cab|wmv|mdb|wav|flv|sisx|dat)$ {
+			proxy_cache www.baiyu.org.cn;
+	        proxy_cache_valid 200 10m;
+        }
+
+		location ~* \.(gif|jpg|jpeg|png|bmp|swf|js|css|ico|mp3|txt|wma|zip|exe|bin|7z|pdf|cab|wmv|mdb|wav|flv|sisx|dat|rar|apk|mp4)$ {
 			proxy_pass     http://www.baiyu.org.cn;
 			proxy_redirect off;
 
@@ -65,5 +79,6 @@ server {
 			}
 		}
 	}
+
 	listen 80;
 }

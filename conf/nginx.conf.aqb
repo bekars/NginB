@@ -3,7 +3,7 @@ worker_rlimit_nofile 42767;
 worker_rlimit_core   500M;
 working_directory    /tmp/;
 #worker_cpu_affinity 0001 0010 0100 1000;
-worker_processes     1;
+worker_processes     4;
 
 
 #error_log  logs/error.log;
@@ -12,23 +12,29 @@ error_log  logs/error.log  debug;
 
 pid        logs/nginx.pid;
 
-daemon         off;
-master_process off;
+daemon         on;
+master_process on;
 
 
 events {
-    worker_connections  40000;
+    worker_connections  4000;
 }
-
 
 http {
     default_type  application/octet-stream;
     server_names_hash_max_size 2048;
     server_names_hash_bucket_size 512;
-        
-    more_set_headers 'Server: BLW' 'X-Cache-Status: $upstream_cache_status';
+    client_header_buffer_size 4k;
+    large_client_header_buffers 4 32k;
 
-    log_format  main     '$remote_addr - $remote_user [$time_local] "$request" '
+    more_set_headers 'Server: BWD-NGX' 'B-Cache-Status: $upstream_cache_status';
+
+    log_format  main     '$remote_addr $hostname $remote_user [$time_local] "$request" '
+        '$status $body_bytes_sent "$http_referer" '
+        '"$http_user_agent" "$http_x_forwarded_for" "$http_cookie" $upstream_cache_status '
+        '"$upstream_http_expires" "$upstream_http_cache_control" "$upstream_http_etag" "$upstream_http_last_modified" '
+        '$request_time $upstream_response_time "$request_body"'; 
+    log_format  full     '$remote_addr $hostname $remote_user [$time_local] "$request" '
         '$status $body_bytes_sent "$http_referer" '
         '"$http_user_agent" "$http_x_forwarded_for" "$http_cookie" $upstream_cache_status '
         '"$upstream_http_expires" "$upstream_http_cache_control" "$upstream_http_etag" "$upstream_http_last_modified" '
@@ -45,14 +51,19 @@ http {
     sendfile        on;
 #   tcp_nopush     on;
 
-    #keepalive_timeout  0;
     keepalive_timeout  120;
-    proxy_buffer_size 64k;
+    proxy_buffer_size 8k;
     proxy_max_temp_file_size 5m;
+    proxy_max_cache_file_size 10m;
     proxy_buffers 8 128k;
     proxy_read_timeout 120;
 
     #gzip  on;
+    gzip_min_length 90k;
+    gzip_proxied    expired no-cache no-store private auth;
+    gzip_types      text/plain text/css application/xml application/x-javascript application/javascript text/javascript;
+    gzip_disable    "MSIE [1-6].";
+
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-Host $host; 
@@ -63,29 +74,47 @@ http {
     proxy_cache_valid 200 302 4h;
     proxy_cache_key "$scheme:$host$request_uri";
     proxy_ignore_client_abort on;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
 
 #    more_set_headers "Powered-By-Anquanbao: $upstream_cache_status_sp from $HOSTNAME";
-#    sub_filter <hr><center>ASERVER/1.2.4-3</center> <hr><center>$HOSTNAME/$nginx_version</center>;
 
 #    sqlfilter_rule_file /etc/nginx/rule_main.xml;
+
+    geo $checkns_group {
+        127.0.0.1/32 127.0.0.1:8888; 
+        10.18.102.195/32 127.0.0.1:8888; 
+    }
+
+    proxy_cache_path /data/nginx/cache_cesu levels=1 keys_zone=cesucache:5m inactive=7d max_size=50m;
 
     server {
         listen 80;
         server_name localhost;
         access_log /usr/local/nginx/logs/access.default.log default;
+
+        pagespeed on;
+        pagespeed FileCachePath /data/nginx/pagespeed_cache;
+
+        root  /usr/local/nginx/html/;
+        index index.html;
+
+        location / {
+            root  /usr/local/nginx/html/;
+            index index.html;
+        }
+
+        location ~* /index.html {
+            more_set_headers 'Cache-Control: max-age=3600';
+            #more_set_headers -t 'text/plain text/css text/html' 'Content-Type: text/foo';
+        }
+
+        # status mod
         location /status {
             stub_status on;
             allow 127.0.0.1;
             allow 59.151.123.78;
             deny all;
-        }
-
-        root  /usr/local/nginx/html/;
-        index index.html;
-        
-        location ~* /index.html {
-            more_set_headers 'Cache-Control: max-age=3600';
-            #more_set_headers -t 'text/plain text/css text/html' 'Content-Type: text/foo';
         }
 
         # lua test
@@ -95,8 +124,9 @@ http {
                 ngx.header.content_type = "text/plain";
                 ngx.say(ngx.var.test);
             ';
+            header_filter_by_lua_file lua/hello.lua;
         }
-        
+
         # echo test
         location /echo {
             echo hello;
@@ -104,10 +134,33 @@ http {
             echo_before_body bekars;
         }
 
-        location /open_url_cost.cgi {
-            #allow 127.0.0.1;
-            #deny all;
-            fastcgi_pass  127.0.0.1:8888;
+        # parse url args
+        # curl http://127.0.0.1/cesu?host=www.baiyu.net.cn\&ip=42.96.137.181
+        location /aqb-cesu {
+            resolver 8.8.8.8;
+            if ( $http_x_anquanbao_speed != CESU ) {
+                return 404;
+            }
+            proxy_set_header Host $arg_host;
+            proxy_set_header X-Anquanbao-Speed "";
+            if ( $arg_ip != "" ) {
+			    proxy_pass http://$arg_ip/;
+            }
+            if ( $arg_ip = "" ) {
+			    proxy_pass http://$arg_host/;
+            }
+	        proxy_cache_valid 200 301 302 7d;
+			proxy_redirect off;
+            proxy_ignore_headers Cache-Control Expires Set-Cookie;
+		    proxy_cache cesucache;
+        }
+
+        # fcgi test
+        location /test.cgi {
+            allow 127.0.0.1;
+            deny all;
+            fastcgi_pass  127.0.0.1:8181;
+            #fastcgi_pass  $checkns_group;
             fastcgi_param  QUERY_STRING       $query_string;
             fastcgi_param  REQUEST_METHOD     $request_method;
             fastcgi_param  CONTENT_TYPE       $content_type;
@@ -130,6 +183,31 @@ http {
             fastcgi_param  REDIRECT_STATUS    200;
         }
 
+        location /api/sitecatcher.cgi {
+            fastcgi_pass        127.0.0.1:9800;
+            fastcgi_connect_timeout     100s;
+            fastcgi_index       sitecatcher.pl;
+            fastcgi_param       SCRIPT_FILENAME $document_root/sitecatcher.pl;
+            include     fastcgi_params;
+            root        /opt/nevel/sitecatcher/bin/;
+        }
+
+        location /api/deletecache {
+            proxy_read_timeout 600;
+            proxy_pass http://mojo_app;
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-HTTPS 0;
+        }
+
+        location /api/agent {
+            proxy_read_timeout 600;
+            proxy_pass http://mojo_app;
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-HTTPS 0;
+        }
+
         location = /200k.jpg {
             expires -1;
             add_header Cache-Control private;
@@ -138,12 +216,20 @@ http {
         }
 
         location ~ ^/(405_1.png|405_2.png|tele_405_1.png)$ {
+            sub_filter <hr><center>ASERVER/1.2.4-3</center> <hr><center>$HOSTNAME/$nginx_version</center>;
             root /usr/local/nginx/;             
         }
     }
 
 #    chunkin on;
 
+#if ($host ~ www\.baiyu\.org\.cn) {
+#        rewrite ^/.+/data/(.*)$ /data/$1 last;
+#    }
     include /usr/local/nginx/conf/proxy/*;
+    include /usr/local/nginx/conf/nginx.conf.cachesrv;
+    include /usr/local/nginx/conf/nginx.conf.hop;
+    include /usr/local/nginx/conf/nginx.conf.mojo;
 }
+
 

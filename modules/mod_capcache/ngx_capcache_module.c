@@ -493,8 +493,7 @@ ngx_capcache_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_value(conf->capcache_enable, prev->capcache_enable, 0);
 
-    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                       "capcache is %d", conf->capcache_enable);
+    //ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "capcache is %d", conf->capcache_enable);
 
     return NGX_CONF_OK;
 }

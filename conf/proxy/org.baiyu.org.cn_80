@@ -1,0 +1,53 @@
+proxy_cache_path /data/nginx/cache/org.baiyu.org.cn levels=1 keys_zone=org.baiyu.org.cn:5m inactive=30m max_size=50m;
+
+upstream org.baiyu.org.cn {
+	server 42.96.137.181;
+	keepalive 32;
+}
+
+server {
+    server_name  org.baiyu.org.cn; 
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Server $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+
+    access_log "/usr/local/nginx/logs/access_org.baiyu.org.cn_80.log"  main;
+
+    set $hosturi org.baiyu.org.cn_80$uri;
+
+    gzip            on;
+    gzip_min_length 1000;
+    gzip_proxied    expired no-cache no-store private auth;
+    gzip_types      text/plain text/css application/xml application/x-javascript application/javascript text/javascript;
+    gzip_disable   "MSIE [1-6].";
+
+    location / {
+        proxy_ignore_headers Expires Cache-Control Set-Cookie;
+        proxy_pass     http://org.baiyu.org.cn;
+        proxy_redirect off;
+
+        more_set_headers 'Last-Modified:';
+        more_set_headers 'Cache-Control: public, max-age=3600';
+        location ~* /$|\.(htm|html)$ {
+            proxy_pass http://org.baiyu.org.cn;
+            proxy_redirect off;
+            proxy_cache org.baiyu.org.cn;
+        }
+
+        location ~* \.(gif|jpg|jpeg|png|bmp|swf|js|css)$ {
+            proxy_pass     http://org.baiyu.org.cn;
+            proxy_redirect off;
+            proxy_cache org.baiyu.org.cn;
+        }
+    }
+
+    location /wafmanager {
+        rewrite  ^/(.*)$  https://org.baiyu.org.cn:8443/;
+    }
+
+    listen 80;
+}
+
