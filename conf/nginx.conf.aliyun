@@ -29,7 +29,7 @@ http {
 
     access_log  logs/access.log  main;
 
-    sendfile        on;
+#sendfile        on;
     #tcp_nopush     on;
 
     #keepalive_timeout  0;
@@ -46,16 +46,17 @@ http {
     server {
         listen       80;
         server_name  localhost;
+        root  html;
 
         #charset koi8-r;
 
         #access_log  logs/host.access.log  main;
 
-        pagespeed on;
-        pagespeed RewriteLevel CoreFilters;
+#pagespeed on;
+#pagespeed RewriteLevel CoreFilters;
 
         # needs to exist and be writable by nginx
-        pagespeed FileCachePath /data/nginx/cache/ngx_pagespeed_cache;
+#pagespeed FileCachePath /data/nginx/cache/ngx_pagespeed_cache;
 
         # This is a temporary workaround that ensures requests for pagespeed
         # optimized resources go to the pagespeed handler.
@@ -73,9 +74,16 @@ http {
 
         location / {
             more_set_headers 'Cache-Control: max-age=3600';
-            root  html/wordpress;
-            index  index.php;
+            root  html;
+#root  html/wordpress;
+#index  index.php;
+            index  index.html;
         }
+        
+#location = /nutwallus {
+#            root  html/nutwallus;
+#            index  index.html;
+#        }
 
         location = /index.html {
             more_set_headers 'Cache-Control: max-age=3600';
@@ -130,7 +138,7 @@ http {
 
     server {
         listen       80;
-        server_name  blog.baiyu.net.cn;
+        server_name  org.baiyu.net.cn;
 
         #charset koi8-r;
 
@@ -145,8 +153,8 @@ http {
         }
 
         location / {
-            root   html/wordpress;
-            index  index.php;
+            root   html;
+#index  index.php;
 #more_set_headers 'Cache-Control: private';
         }
     }
