@@ -27,12 +27,14 @@ NGX_MOD_CONFIG    = \
 #	--add-module=${NGX_MOD_PATH}/ngx_pagespeed \
 #	--add-module=${NGX_MOD_PATH}/ngx_http_coolplay_filter_module
 
+#export LUAJIT_LIB=/path/to/luajit/lib
+#export LUAJIT_INC=/path/to/luajit/include/luajit-2.1
 
 all: config build
 
 PHONY += config
 config:
-	cd ${NGX_PATH}; \
+	cd ${NGX_PATH} \
 	./configure ${NGX_MOD_CONFIG}
 
 PHONY += build
