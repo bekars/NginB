@@ -1,12 +1,16 @@
 #
-# forward proxy for hop cluster
+# hop cluster config
 #
 
 server {
-    listen 8282 default backlog=1024;
-    access_log "/usr/local/apache2/logs/access_Hop.log"  main;
+    listen 8182;
+
+    more_set_headers "X-Hop-By: $HOSTNAME";
 
     location / {
+        access_log /usr/local/nginx/logs/access.full.log full;
+        error_log /usr/local/nginx/logs/error.full.log;
+
         proxy_pass $scheme://$http_x_hop_to$request_uri;
         proxy_redirect off;
     }

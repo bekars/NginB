@@ -7,8 +7,7 @@ worker_processes     4;
 
 
 #error_log  logs/error.log;
-#error_log  logs/error.log  notice;
-error_log  logs/error.log  debug;
+error_log  logs/error.log  notice;
 
 pid        logs/nginx.pid;
 
@@ -38,7 +37,7 @@ http {
         '$status $body_bytes_sent "$http_referer" '
         '"$http_user_agent" "$http_x_forwarded_for" "$http_cookie" $upstream_cache_status '
         '"$upstream_http_expires" "$upstream_http_cache_control" "$upstream_http_etag" "$upstream_http_last_modified" '
-        '$request_time $upstream_response_time "$request_body"'; 
+        '$request_time "$upstream_response_time" $content_length "$upstream_http_x_hop_by" "$request_body"'; 
     log_format default '$remote_addr $host $remote_user [$time_local] "$request" '
         '$status $body_bytes_sent "$http_referer" '
         '"$http_user_agent" "$http_x_forwarded_for" "$http_cookie" $upstream_cache_status';
@@ -54,7 +53,7 @@ http {
     keepalive_timeout  120;
     proxy_buffer_size 8k;
     proxy_max_temp_file_size 5m;
-    proxy_max_cache_file_size 10m;
+#proxy_max_cache_file_size 10m;
     proxy_buffers 8 128k;
     proxy_read_timeout 120;
 
@@ -93,8 +92,8 @@ http {
         server_name localhost;
         access_log /usr/local/nginx/logs/access.default.log default;
 
-        pagespeed on;
-        pagespeed FileCachePath /data/nginx/pagespeed_cache;
+#pagespeed on;
+#pagespeed FileCachePath /data/nginx/pagespeed_cache;
 
         root  /usr/local/nginx/html/;
         index index.html;
@@ -184,28 +183,12 @@ http {
         }
 
         location /api/sitecatcher.cgi {
-            fastcgi_pass        127.0.0.1:9800;
+            fastcgi_pass                127.0.0.1:9800;
             fastcgi_connect_timeout     100s;
-            fastcgi_index       sitecatcher.pl;
-            fastcgi_param       SCRIPT_FILENAME $document_root/sitecatcher.pl;
-            include     fastcgi_params;
-            root        /opt/nevel/sitecatcher/bin/;
-        }
-
-        location /api/deletecache {
-            proxy_read_timeout 600;
-            proxy_pass http://mojo_app;
-            proxy_set_header Host $host;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-HTTPS 0;
-        }
-
-        location /api/agent {
-            proxy_read_timeout 600;
-            proxy_pass http://mojo_app;
-            proxy_set_header Host $host;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-HTTPS 0;
+            fastcgi_index               sitecatcher.pl;
+            fastcgi_param               SCRIPT_FILENAME $document_root/sitecatcher.pl;
+            include                     fastcgi_params;
+            root                        /opt/nevel/sitecatcher/bin/;
         }
 
         location = /200k.jpg {
@@ -227,9 +210,11 @@ http {
 #        rewrite ^/.+/data/(.*)$ /data/$1 last;
 #    }
     include /usr/local/nginx/conf/proxy/*;
-    include /usr/local/nginx/conf/nginx.conf.cachesrv;
-    include /usr/local/nginx/conf/nginx.conf.hop;
-    include /usr/local/nginx/conf/nginx.conf.mojo;
+#include /usr/local/nginx/conf/nginx.conf.cachesrv;
+#include /usr/local/nginx/conf/nginx.conf.hop;
+#include /usr/local/nginx/conf/nginx.conf.mojo;
+    include /opt/nevel/sitecatcher/site_catcher/nginx/nginx.sc.conf;
+    include /opt/nevel/sitecatcher/site_catcher/nginx/nginx.sitecatcher.conf;
 }
 
 
