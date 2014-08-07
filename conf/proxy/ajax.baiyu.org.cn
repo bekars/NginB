@@ -1,0 +1,11 @@
+
+server {
+    listen 80;
+    server_name  ajax.baiyu.org.cn; 
+
+    location / {
+        root   wwwroot/ajax;
+        index  index.html;
+    }
+}
+

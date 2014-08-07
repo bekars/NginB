@@ -3,7 +3,6 @@ server {
     listen 80;
     server_name  lua.baiyu.org.cn; 
 
-
     location / {
         content_by_lua_file lua/root.lua;
     }

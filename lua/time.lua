@@ -2,5 +2,5 @@
 -- get now time
 ---]]]
 
-io.write("Time is:");
+ngx.say("Time");
 
