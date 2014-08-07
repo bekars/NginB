@@ -37,6 +37,20 @@ http {
     resolver 8.8.8.8;
     more_set_headers 'Server: BWD-ALY81';
 
+    lua_package_path '/home/baiyu/Git/NginB/lua/?.lua;/home/baiyu/Git/NginB/lua/lib/?.lua';
+    lua_package_cpath '/usr/lib/?.so;;';
+    lua_max_pending_timers 10240;
+    lua_max_running_timers 2560;
+    lua_socket_log_errors off;
+    lua_shared_dict keys     64m;
+    lua_shared_dict ipcache  128m;
+    lua_shared_dict conf     128m;
+    lua_shared_dict dns      64m;
+    lua_shared_dict scanner  64m;
+    lua_shared_dict sla      64m;
+    lua_shared_dict shCDN    64m;
+    lua_need_request_body off;
+
     server {
         listen       80;
         server_name  localhost;
