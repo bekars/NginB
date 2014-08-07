@@ -1,0 +1,112 @@
+proxy_cache_path /data/nginx/cache/aqb.moji002.com levels=1 keys_zone=aqb.moji002.com:5m inactive=9h max_size=20m;
+
+upstream aqb.moji002.com {
+	server 223.203.194.216 max_fails=5 fail_timeout=30s;
+	server 219.232.254.79 backup;
+	keepalive 32;
+}
+
+upstream cachecenter {
+	server 219.232.254.79;
+}
+
+server {
+	server_name aqb.moji002.com; 
+    set $data_path $uri;
+    if ($uri ~ ^/.+/data/(.*)$) {
+        set $data_path /data/$1;
+    }
+    proxy_cache_key "$scheme:$host$data_path";
+    rewrite ^/.+/data/(.*)$ /data/$1 last;
+
+	referer_hash_bucket_size 128; 
+	referer_hash_max_size 4096; 
+
+	access_log "/usr/local/apache2/logs/access_aqb.moji002.com_80.log"  main;
+	if ($http_x_cdn_by ~ Anquanbao){
+		return 403;
+	}
+
+	set $hosturi aqb.moji002.com_80$uri;
+
+	gzip  on;
+
+
+	error_page 405 /error/nsngx_ep_405.html;
+	location = /error/nsngx_ep_405.html {
+		ssi on;
+		ssi_silent_errors on;
+		root /usr/local/nginx/;
+		internal;
+	}
+	error_page 502 /error/nsngx_ep_502.html;
+	location = /error/nsngx_ep_502.html {
+		ssi on;
+		ssi_silent_errors on;
+		root /usr/local/nginx/;
+		internal;
+	}
+	error_page 504 /error/nsngx_ep_504.html;
+	location = /error/nsngx_ep_504.html {
+		ssi on;
+		ssi_silent_errors on;
+		root /usr/local/nginx/;
+		internal;
+	}
+
+	proxy_cache_valid 200 1d;
+
+    location ~* /refreshcache {
+        set $data_path $uri;
+        if ($uri ~ ^/.+/data/(.*)$) {
+            set $data_path /data/$1;
+        }
+        proxy_cache_key "$scheme:$host$data_path";
+        rewrite ^/.+/data/(.*)$ /data/$1 break;
+			
+        proxy_pass     http://cachecenter;
+		proxy_redirect off;
+  	 	proxy_cache_valid 200 10m;
+		proxy_cache aqb.moji002.com;
+    }
+
+	location ~* /$|\.(htm|html)$ {
+		proxy_pass     http://aqb.moji002.com;
+		proxy_redirect off;
+
+		proxy_cache aqb.moji002.com;
+		proxy_ignore_headers Expires Cache-Control Set-Cookie;
+
+		proxy_cache_valid 200 1h;
+
+		set $aqb_cache_time 1h;
+		set $aqb_content_type 1;
+		header_filter_by_lua_file /etc/nginx/lua_script/aqb_ttl.lua;
+	}
+
+	location / {
+		proxy_pass     http://aqb.moji002.com;
+		proxy_redirect off;
+
+		location ~* \.(xml)$ {
+			proxy_pass     http://aqb.moji002.com;
+			proxy_redirect off;
+  	 		proxy_cache_valid 200 10m;
+			proxy_cache aqb.moji002.com;
+		}
+
+		location ~* \.(gif|jpg|jpeg|png|bmp|swf|js|css|ico|mp3|txt|wma|zip|exe|bin|7z|pdf|cab|wmv|mdb|wav|flv|sisx|dat|rar|apk|mp4)$ {
+			proxy_pass     http://aqb.moji002.com;
+			proxy_redirect off;
+
+			proxy_cache aqb.moji002.com;
+			proxy_ignore_headers Expires Cache-Control Set-Cookie;
+
+			set $aqb_cache_time 1d;
+			set $aqb_content_type 0;
+			header_filter_by_lua_file /etc/nginx/lua_script/aqb_ttl.lua;
+		}
+	}
+
+	listen 80;
+}

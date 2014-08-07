@@ -1,0 +1,100 @@
+proxy_cache_path /data/nginx/cache/w3.baiyu.org.cn levels=1 keys_zone=w3.baiyu.org.cn:5m inactive=9h max_size=500m;
+
+upstream w3.baiyu.org.cn {
+	server 42.96.137.181;
+	keepalive 32;
+}
+
+server {
+	server_name  w3.baiyu.org.cn ; 
+
+	referer_hash_bucket_size 128; 
+	referer_hash_max_size 4096; 
+
+	access_log "/usr/local/apache2/logs/access_w3.baiyu.org.cn_80.log"  main;
+
+	set $hosturi w3.baiyu.org.cn_80$uri;
+
+	gzip  on;
+
+	error_page 411 = @my_411_error;
+	location @my_411_error {
+#chunkin_resume;
+	}
+
+	error_page 405 /error/nsngx_ep_405.html;
+	location = /error/nsngx_ep_405.html {
+		ssi on;
+		ssi_silent_errors on;
+		root /usr/local/nginx/;
+		internal;
+	}
+	error_page 502 /error/nsngx_ep_502.html;
+	location = /error/nsngx_ep_502.html {
+		ssi on;
+		ssi_silent_errors on;
+		root /usr/local/nginx/;
+		internal;
+	}
+	error_page 504 /error/nsngx_ep_504.html;
+	location = /error/nsngx_ep_504.html {
+		ssi on;
+		ssi_silent_errors on;
+		root /usr/local/nginx/;
+		internal;
+	}
+
+	proxy_cache_valid 200 1d;
+
+#sqlfilter               on;
+#sqlfilter_log_file      /usr/local/nginx/logs/w3.baiyu.org.cn_80_sqlfilter.log;
+#sqlfilter_deny          on;
+#smartrule_deny          off;
+
+	location ~* /$|\.(htm|html)$ {
+		proxy_pass     http://w3.baiyu.org.cn;
+		proxy_redirect off;
+
+		proxy_cache w3.baiyu.org.cn;
+		proxy_ignore_headers Expires Cache-Control Set-Cookie;
+
+		proxy_cache_valid 200 1h;
+
+		set $aqb_cache_time 1h;
+		set $aqb_content_type 1;
+		header_filter_by_lua_file /etc/nginx/lua_script/aqb_ttl.lua;
+	}
+
+	location / {
+		proxy_pass     http://w3.baiyu.org.cn;
+		proxy_redirect off;
+
+#include /etc/nginx/rule/file_w3.baiyu.org.cn_80;
+
+		location ~* \.(gif|jpg|jpeg|png|bmp|swf|js|css|ico|mp3|txt|wma|zip|exe|bin|7z|pdf|cab|wmv|mdb|wav|flv|sisx|dat|rar|apk|mp4)$ {
+			proxy_pass     http://w3.baiyu.org.cn;
+			proxy_redirect off;
+
+			proxy_cache w3.baiyu.org.cn;
+			proxy_ignore_headers Expires Cache-Control Set-Cookie;
+
+			valid_referers none blocked baiyu.org.cn *.baiyu.org.cn *.baidu.com *.bing.com *.google.com *.google.com.hk *.jike.com *.sogou.com *.soso.com *.youdao.com *.baiducontent.com *.sososnap.com ;
+			if ($invalid_referer) {
+				access_log "/usr/local/nginx/logs/w3.baiyu.org.cn_80_sqlfilter.log" hotlink;
+				return 403;
+			}
+
+			set $aqb_cache_time 1d;
+			set $aqb_content_type 0;
+			header_filter_by_lua_file /etc/nginx/lua_script/aqb_ttl.lua;
+		}
+	}
+
+	location = /X19hcWJfc2V0X3NyY19zaXRlX2Nvb2tpZV9f {
+#sqlfilter_set_cookie /usr/local/nginx/error/405_verify_ok.html /usr/local/nginx/error/405_verify_fail.html;
+		access_log off;
+	}
+#include /etc/nginx/nginx_server_cc.conf;
+	listen 80;
+}
+

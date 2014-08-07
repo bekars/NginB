@@ -76,12 +76,6 @@ http {
             ';
         }
 
-        location /cesu {
-            content_by_lua '
-                ngx.say(ngx.var.remote_addr);
-                --return ngx.redirect("http://"..ngx.var.remote_addr.."/200k.jpg");
-            ';
-        }
     }
     
     include /usr/local/nginx/conf/proxy/*;

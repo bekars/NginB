@@ -1,0 +1,62 @@
+proxy_cache_path /data/nginx/cache/www.ownsec.com levels=1 keys_zone=www.ownsec.com:5m inactive=30m max_size=50m;
+
+upstream www.ownsec.com {
+	server 192.157.220.146;
+	keepalive 32;
+}
+
+server {
+    server_name  www.ownsec.com; 
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Server $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+
+    access_log "/usr/local/nginx/logs/access_www.ownsec.com_80.log"  main;
+
+    set $hosturi www.ownsec.com_80$uri;
+
+    gzip            on;
+    gzip_min_length 1000;
+    gzip_proxied    expired no-cache no-store private auth;
+    gzip_types      text/plain text/css application/xml application/x-javascript application/javascript text/javascript;
+    gzip_disable   "MSIE [1-6].";
+
+    location / {
+        coolplay on;
+        coolplay_action rewrite;
+
+        proxy_ignore_headers Expires Cache-Control Set-Cookie;
+        proxy_pass     http://www.ownsec.com;
+        proxy_redirect off;
+
+        more_set_headers 'Last-Modified:';
+        more_set_headers 'Cache-Control: public, max-age=3600';
+        location ~* /$|\.(htm|html)$ {
+            coolplay on;
+            coolplay_action rewrite;
+
+            proxy_pass http://www.ownsec.com;
+            proxy_redirect off;
+#proxy_cache www.ownsec.com;
+        }
+
+        location ~* \.(gif|jpg|jpeg|png|bmp|swf|js|css)$ {
+            coolplay on;
+            coolplay_action rewrite;
+
+            proxy_pass     http://www.ownsec.com;
+            proxy_redirect off;
+            proxy_cache www.ownsec.com;
+        }
+    }
+
+    location /wafmanager {
+        rewrite  ^/(.*)$  https://www.ownsec.com:8443/;
+    }
+
+    listen 80;
+}
+

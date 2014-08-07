@@ -1,0 +1,25 @@
+
+server {
+	listen 80;
+	server_name  lua.baiyu.org.cn; 
+        
+    location / {
+        content_by_lua '
+            ngx.say("<html><body>Lua Test !!!</body></html>");
+        ';
+    }
+
+    location /time {
+        content_by_lua '
+            ngx.say("time");
+        ';
+    }
+
+    location /cesu {
+        content_by_lua '
+            ngx.say(ngx.var.remote_addr);
+            --return ngx.redirect("http://"..ngx.var.remote_addr.."/200k.jpg");
+        ';
+    }
+}
+
