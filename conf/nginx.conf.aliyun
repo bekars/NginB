@@ -1,16 +1,11 @@
 
-#user  nobody;
-worker_processes  1;
+worker_processes  2;
 
-#error_log  logs/error.log;
-#error_log  logs/error.log  notice;
 error_log  logs/error.log  info;
-
 pid        logs/nginx.pid;
 
 daemon on;
 master_process on;
-
 
 events {
     worker_connections  1024;
@@ -29,10 +24,9 @@ http {
 
     access_log  logs/access.log  main;
 
-#sendfile        on;
+    #sendfile        on;
     #tcp_nopush     on;
 
-    #keepalive_timeout  0;
     keepalive_timeout  300;
 
 #    gzip  on;
@@ -50,13 +44,11 @@ http {
 
         #charset koi8-r;
 
-        #access_log  logs/host.access.log  main;
-
-#pagespeed on;
-#pagespeed RewriteLevel CoreFilters;
+        #pagespeed on;
+        #pagespeed RewriteLevel CoreFilters;
 
         # needs to exist and be writable by nginx
-#pagespeed FileCachePath /data/nginx/cache/ngx_pagespeed_cache;
+        #pagespeed FileCachePath /data/nginx/cache/ngx_pagespeed_cache;
 
         # This is a temporary workaround that ensures requests for pagespeed
         # optimized resources go to the pagespeed handler.
@@ -75,21 +67,9 @@ http {
         location / {
             more_set_headers 'Cache-Control: max-age=3600';
             root  html;
-#root  html/wordpress;
-#index  index.php;
             index  index.html;
         }
         
-#location = /nutwallus {
-#            root  html/nutwallus;
-#            index  index.html;
-#        }
-
-        location = /index.html {
-            more_set_headers 'Cache-Control: max-age=3600';
-#more_set_headers -t 'text/plain text/css text/html' 'Content-Type: text/foo';
-        }
-
         location /xizang {
             content_by_lua '
                 return ngx.redirect("https://app.yinxiang.com/shard/s20/sh/dc19fbf3-d167-4574-88af-b45649af5262/2501665eb9413764581f7c3a9ede2e7d");
@@ -97,110 +77,13 @@ http {
         }
 
         location /cesu {
-#echo $remote_addr;
             content_by_lua '
                 ngx.say(ngx.var.remote_addr);
                 --return ngx.redirect("http://"..ngx.var.remote_addr.."/200k.jpg");
             ';
         }
-
-#        location ~ .*\.(js|css|gif|jpg|jpeg|png|bmp|swf)$ {
-#            expires 6m;
-#        }
-
-        #error_page  404              /404.html;
-
-        # redirect server error pages to the static page /50x.html
-        #
-        error_page   500 502 503 504  /50x.html;
-        location = /50x.html {
-            root   html;
-        }
-
-        # proxy the PHP scripts to Apache listening on 127.0.0.1:80
-        #
-        #location ~ \.php$ {
-        #    proxy_pass   http://127.0.0.1;
-        #}
-
-        # pass the PHP scripts to FastCGI server listening on 127.0.0.1:9000
-        #
-        #location ~ \.php$ {
-        #    root           html;
-        #    fastcgi_pass   127.0.0.1:9000;
-        #    fastcgi_index  index.php;
-        #    fastcgi_param  SCRIPT_FILENAME  /scripts$fastcgi_script_name;
-        #    include        fastcgi_params;
-        #}
-
-        # deny access to .htaccess files, if Apache's document root
-        # concurs with nginx's one
-        #
-        #location ~ /\.ht {
-        #    deny  all;
-        #}
     }
     
     include /usr/local/nginx/conf/proxy/*;
-
-    server {
-        listen       80;
-        server_name  org.baiyu.net.cn;
-
-        #charset koi8-r;
-
-        #access_log  logs/host.access.log  main;
-
-        location ~ \.php$ {
-            root  html/wordpress;
-            fastcgi_pass 127.0.0.1:8181;
-#                fastcgi_index index.php;
-            fastcgi_param SCRIPT_FILENAME $document_root/$fastcgi_script_name;
-            include fastcgi_params;
-        }
-
-        location / {
-            root   html;
-#index  index.php;
-#more_set_headers 'Cache-Control: private';
-        }
-    }
-
-    # another virtual host using mix of IP-, name-, and port-based configuration
-    #
-    #server {
-    #    listen       8000;
-    #    listen       somename:8080;
-    #    server_name  somename  alias  another.alias;
-
-    #    location / {
-    #        root   html;
-    #        index  index.html index.htm;
-    #    }
-    #}
-
-
-    # HTTPS server
-    #
-    #server {
-    #    listen       443;
-    #    server_name  localhost;
-
-    #    ssl                  on;
-    #    ssl_certificate      cert.pem;
-    #    ssl_certificate_key  cert.key;
-
-    #    ssl_session_timeout  5m;
-
-    #    ssl_protocols  SSLv2 SSLv3 TLSv1;
-    #    ssl_ciphers  HIGH:!aNULL:!MD5;
-    #    ssl_prefer_server_ciphers   on;
-
-    #    location / {
-    #        root   html;
-    #        index  index.html index.htm;
-    #    }
-    #}
-
 }
 

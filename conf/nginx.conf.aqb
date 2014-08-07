@@ -182,15 +182,6 @@ http {
             fastcgi_param  REDIRECT_STATUS    200;
         }
 
-        location /api/sitecatcher.cgi {
-            fastcgi_pass                127.0.0.1:9800;
-            fastcgi_connect_timeout     100s;
-            fastcgi_index               sitecatcher.pl;
-            fastcgi_param               SCRIPT_FILENAME $document_root/sitecatcher.pl;
-            include                     fastcgi_params;
-            root                        /opt/nevel/sitecatcher/bin/;
-        }
-
         location = /200k.jpg {
             expires -1;
             add_header Cache-Control private;
@@ -204,17 +195,9 @@ http {
         }
     }
 
-#    chunkin on;
-
-#if ($host ~ www\.baiyu\.org\.cn) {
-#        rewrite ^/.+/data/(.*)$ /data/$1 last;
-#    }
     include /usr/local/nginx/conf/proxy/*;
-#include /usr/local/nginx/conf/nginx.conf.cachesrv;
-#include /usr/local/nginx/conf/nginx.conf.hop;
-#include /usr/local/nginx/conf/nginx.conf.mojo;
+    #include /usr/local/nginx/extern/*;
     include /opt/nevel/sitecatcher/site_catcher/nginx/nginx.sc.conf;
     include /opt/nevel/sitecatcher/site_catcher/nginx/nginx.sitecatcher.conf;
 }
-
 

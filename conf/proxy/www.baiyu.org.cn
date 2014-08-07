@@ -1,0 +1,30 @@
+
+server {
+	listen 80;
+	server_name  www.baiyu.org.cn org.baiyu.org.cn; 
+        
+    location / {
+        root   html;
+    }
+}
+
+#server {
+#    listen       443;
+#    server_name  localhost;
+
+#    ssl                  on;
+#    ssl_certificate      cert.pem;
+#    ssl_certificate_key  cert.key;
+
+#    ssl_session_timeout  5m;
+
+#    ssl_protocols  SSLv2 SSLv3 TLSv1;
+#    ssl_ciphers  HIGH:!aNULL:!MD5;
+#    ssl_prefer_server_ciphers   on;
+
+#    location / {
+#        root   html;
+#        index  index.html index.htm;
+#    }
+#}
+
