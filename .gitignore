@@ -2,11 +2,12 @@
 *.bak
 *.result
 *.swp
-nginx-1.2.4/Makefile
-nginx-1.2.4/objs/
 FILES
 cscope.in.out
 cscope.out
 cscope.po.out
 tags
 ngx_mods
+nginx-1.6.0
+script
+deploy.sh

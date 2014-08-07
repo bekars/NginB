@@ -9,9 +9,7 @@ server {
     }
 
     location /time {
-        content_by_lua '
-            ngx.say("time");
-        ';
+        content_by_lua_file lua/time.lua;
     }
 
     location /cesu {
