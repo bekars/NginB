@@ -40,7 +40,7 @@ http {
 #    gzip_proxied any;
 #    gzip_types text/plain application/xml application/x-javascript text/javascript text/css;
 
-    resolver 202.106.0.20;
+    resolver 8.8.8.8;
     more_set_headers 'Server: BWD-ALY81';
 
     server {
@@ -90,6 +90,12 @@ http {
 #more_set_headers -t 'text/plain text/css text/html' 'Content-Type: text/foo';
         }
 
+        location /xizang {
+            content_by_lua '
+                return ngx.redirect("https://app.yinxiang.com/shard/s20/sh/dc19fbf3-d167-4574-88af-b45649af5262/2501665eb9413764581f7c3a9ede2e7d");
+            ';
+        }
+
         location /cesu {
 #echo $remote_addr;
             content_by_lua '
@@ -97,6 +103,7 @@ http {
                 --return ngx.redirect("http://"..ngx.var.remote_addr.."/200k.jpg");
             ';
         }
+
 #        location ~ .*\.(js|css|gif|jpg|jpeg|png|bmp|swf)$ {
 #            expires 6m;
 #        }
