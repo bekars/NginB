@@ -5,10 +5,7 @@ server {
 
 
     location / {
-        content_by_lua '
-            ngx.header["Content-Type"] = "test/html";
-            ngx.say("<html><body>Lua Test !!!</body></html>");
-        ';
+        content_by_lua_file lua/root.lua;
     }
 
     location /time {
