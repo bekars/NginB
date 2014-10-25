@@ -4,7 +4,7 @@ NGX_PATH     = $(TOP_PATH)/nginx-$(NGX_VER)
 MODULES_PATH = $(TOP_PATH)/modules
 NGX_MOD_PATH = $(TOP_PATH)/ngx_mods
 
-NGX_MOD_CONFIG    = \
+NGX_MOD_CONFIG = \
 	--error-log-path=/var/log/error.log \
 	--pid-path=/var/run/nginx.pid \
 	--with-debug \
@@ -17,6 +17,7 @@ NGX_MOD_CONFIG    = \
 	--http-proxy-temp-path=/data/nginx/cache_tmp \
 	--add-module=${NGX_MOD_PATH}/headers-more-nginx-module \
 	--add-module=${NGX_MOD_PATH}/echo-nginx-module \
+	--add-module=${NGX_MOD_PATH}/nginx-upload-module \
 	--add-module=${NGX_MOD_PATH}/ngx_devel_kit \
 	--add-module=${NGX_MOD_PATH}/lua-nginx-module
 #	--add-module=${NGX_MOD_PATH}/srcache-nginx-module \
@@ -34,8 +35,7 @@ all: config build
 
 PHONY += config
 config:
-	cd ${NGX_PATH} \
-	./configure ${NGX_MOD_CONFIG}
+	cd ${NGX_PATH} && ./configure ${NGX_MOD_CONFIG}
 
 PHONY += build
 build:
@@ -56,6 +56,7 @@ ngxmod:
 	cd ${NGX_MOD_PATH} && git clone https://github.com/openresty/headers-more-nginx-module.git
 	cd ${NGX_MOD_PATH} && git clone https://github.com/openresty/lua-nginx-module.git
 	cd ${NGX_MOD_PATH} && git clone https://github.com/simpl/ngx_devel_kit.git
+	cd ${NGX_MOD_PATH} && git clone https://github.com/vkholodkov/nginx-upload-module.git
 
 .PHONY: $(PHONY)
 
