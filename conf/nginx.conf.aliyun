@@ -56,7 +56,7 @@ http {
     server {
         listen       80;
         server_name  localhost;
-        root  wwwroot;
+        root  html;
 
         client_max_body_size 100m;
 
@@ -75,7 +75,8 @@ http {
         location ~ "^/ngx_pagespeed_beacon$" { }
         
         location ~ \.php$ {
-            root  html/wordpress;
+            root  wwwroot;
+            #root  html/wordpress;
             fastcgi_pass 127.0.0.1:9000;
             fastcgi_index index.php;
             fastcgi_param SCRIPT_FILENAME $document_root/$fastcgi_script_name;
@@ -88,7 +89,7 @@ http {
             index  index.html;
         }
  
-        location ~ \.html$ {
+        location = /upload.html {
             more_set_headers 'Cache-Control: max-age=3600';
             root  wwwroot;
             index  index.html;
@@ -110,7 +111,7 @@ http {
             upload_store /tmp 1;
 
             # Allow uploaded files to be read only by user
-            upload_store_access user:r;
+            upload_store_access user:rw group:rw all:rw;
 
             # Set specified fields in request body
             upload_set_form_field "${upload_field_name}_name" $upload_file_name;
@@ -126,15 +127,8 @@ http {
 
         # Pass altered request body to a backend
         location @upload_php {
-            proxy_pass   http://localhost:9000;
-        }
-
-        location = /upload.php {
-            root  wwwroot/php;
-            fastcgi_pass 127.0.0.1:9000;
-            fastcgi_index upload.php;
-            fastcgi_param SCRIPT_FILENAME $document_root/$fastcgi_script_name;
-            include fastcgi_params;
+            root  wwwroot;
+            rewrite ^(.*)$ /upload.php last;
         }
     }
     
