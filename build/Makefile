@@ -56,7 +56,7 @@ ngxmod:
 	cd ${NGX_MOD_PATH} && git clone https://github.com/openresty/headers-more-nginx-module.git
 	cd ${NGX_MOD_PATH} && git clone https://github.com/openresty/lua-nginx-module.git
 	cd ${NGX_MOD_PATH} && git clone https://github.com/simpl/ngx_devel_kit.git
-	cd ${NGX_MOD_PATH} && git clone https://github.com/vkholodkov/nginx-upload-module.git
+	cd ${NGX_MOD_PATH} && git clone -b 2.2 https://github.com/vkholodkov/nginx-upload-module.git
 
 .PHONY: $(PHONY)
 
