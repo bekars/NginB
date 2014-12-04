@@ -9,27 +9,27 @@
 
 volatile ngx_cycle_t  *ngx_cycle;
 
-void
-ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err, const char *fmt, ...)
-{
-}
+void ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err, const char *fmt, ...) {}
 
 typedef struct example_s {
     int a;
-    char* b;
+    char *b;
 } example_t;
 
 int main()
 {
     ngx_pool_t *pool;
-    example_t* exp;
-    char* s;
+    example_t *exp;
+    char *s;
+    ngx_log_t *log;
 
-    pool = ngx_create_pool(5000, NULL);
-    printf("available pool regular pool free size is %d now\n", (ngx_uint_t) (pool->d.end - pool->d.last));
+    log = (ngx_log_t *)malloc(sizeof(ngx_log_t));
+    log->log_level = 0;
+    pool = ngx_create_pool(5000, log);
+    printf("available pool regular pool free size is %d now\n", (ngx_uint_t)(pool->d.end - pool->d.last));
     exp = ngx_palloc(pool, sizeof(example_t)) ;
     s = ngx_palloc(pool, sizeof("hello,world"));
-    printf("available pool regular pool free size is %d now\n", (ngx_uint_t) (pool->d.end - pool->d.last));
+    printf("available pool regular pool free size is %d now\n", (ngx_uint_t)(pool->d.end - pool->d.last));
     exp->a = 1;
     exp->b = s;
     strcpy(s, "hello,world");
