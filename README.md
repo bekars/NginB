@@ -1,1 +1,1 @@
-nginx deep development.
+nginx development and test environment.
